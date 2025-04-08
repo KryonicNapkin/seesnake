@@ -5,4 +5,4 @@
 > It is filled with bugs and with a lot of stupid coding decisions.
 > Install only for LEARNING PURPOSES
 
-PS: I'm still learning C :]
+I'm still learning C and I'm also lazy so I don't write to much comments to explain what I'm doing :]
