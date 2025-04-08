@@ -1,0 +1,11 @@
+rows = 30
+cols = 30
+cell_size = 15.0
+border_width = 3
+cell_spacing = 3
+tail_lenght_at_spawn = 4
+background_color = "#98C379FF"
+foreground_color = "#282C34FF"
+snake_food_color = "#FB4934FF"
+snake_food_color_border = "#CC241DFF"
+snake_head_color = "#0079F1FF"

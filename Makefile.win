@@ -1,0 +1,31 @@
+SRC_DIR := src
+OBJ_DIR := obj
+BIN_DIR := build
+
+EXE  := $(BIN_DIR)/seesnake.exe
+SRC  := $(wildcard $(SRC_DIR)/*.c)
+OBJ  := $(SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
+
+CC       := x86_64-w64-mingw32-gcc
+CFLAGS 	 := -std=c11 -ggdb3 -O2 -Wall -Wextra -Wpedantic
+LDFLAGS	 := -L./lib/raylib-win64/lib
+LDLIBS	 := -l:raylib.dll -lraylib -lopengl32 -lgdi32 -lwinmm 
+CPPFLAGS := -Iinclude -I./lib/raylib-win64/include -MMD -MP
+
+.PHONY: all clean build
+
+all: $(EXE)
+
+$(EXE): $(OBJ)
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LDLIBS) -o $@
+
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+$(OBJ_DIR):
+	mkdir -p $@
+
+clean:
+	@$(RM) -rv $(EXE) $(OBJ)
+
+-include $(OBJ:.o=.d)
