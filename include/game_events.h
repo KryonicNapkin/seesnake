@@ -8,8 +8,6 @@
 #define EVENT_CHANGE_MOVE_RIGHT   (1 << 4U)    /* 0x000000010000 */
 #define EVENT_FOOD_COLLISION      (1 << 5U)    /* 0x000000100000 */
 #define EVENT_HEAD_TAIL_COLLISION (1 << 6U)    /* 0x000001000000 */
-#define EVENT_INCREASE_SNAKE_VEL  (1 << 7U)    /* 0x000010000000 */
-#define EVENT_DECREASE_SNAKE_VEL  (1 << 8U)    /* 0x000100000000 */
 #define EVENT_RESTART_GAME        (1 << 9U)    /* 0x001000000000 */
 #define EVENT_PAUSE_GAME          (1 << 10U)   /* 0x010000000000 */
 #define EVENT_TO_THE_MAIN_MENU    (1 << 11U)   /* 0x100000000000 */
