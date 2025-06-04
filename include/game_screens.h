@@ -23,6 +23,7 @@ typedef enum UserMenuActions {
     PAUSE,                              /* When RUNNING */
     UNPAUSE,                            /* When PAUSED */
 
+    /* TODO: Make settings actions */
     CHANGE_BG_COLOR,                    /* In SETTINGS_MENU */
     CHANGE_FG_COLOR,                    /* In SETTINGS_MENU */
     CHANGE_NUMBER_OF_ROWS,              /* In SETTINGS_MENU */
