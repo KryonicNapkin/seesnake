@@ -2,7 +2,8 @@ SRC_DIR := src
 OBJ_DIR := obj
 BIN_DIR := build
 
-EXE  := $(BIN_DIR)/seesnake_linux
+# Version format x.y.z-beta
+EXE  := $(BIN_DIR)/seesnake_linux_$(VERSION)
 SRC  := $(wildcard $(SRC_DIR)/*.c)
 OBJ  := $(SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 
