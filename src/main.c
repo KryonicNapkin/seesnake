@@ -1,3 +1,19 @@
+/* 
+ * VERSION HISTORY: 
+ *     First version: 1.0.0-beta
+ *     Changelog: Initial release of the game
+ *
+ *     Current version: 1.0.1-beta
+ *     Changelog: Changed: Rate of change in the speed of the snake is not depended on that speed
+ *                         It is set to the constant game speed of 60FPS
+ *                Removed: EVENTS in the include/game_events.h that handled the change of speed from the game events
+ *
+ *     Upcomming version: 1.0.2-beta
+ *     Changelog: Added: You can see your version number in the title screen
+ *                       End screen - Press 'r' to restart
+ *                Removed: Text: "DEMO!!!" and "Work in progress..." 
+ *                       
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -17,16 +33,6 @@
 #include "../include/fonts/elem_font.h"
 #include "../include/fonts/title_font.h"
 #include "../include/fonts/font.h"
-
-/* 
- * TODO: Make end game screen and make it possible to restart
- * TODO: Make leadership board
- */
-
-/*
- * DONE: Make title screen
- * DONE: Make score count and time count
- */
 
 #define STATS_SPACE 25.0f
 typedef struct SeeSnakeTime {
@@ -127,6 +133,13 @@ int main(int argc, char* argv[]) {
                 else game.mstate = PAUSED;
             }
         }
+        if (game.mstate != PAUSED && game.mstate == RUNNING) {
+            if (IsKeyPressed(KEY_KP_SUBTRACT) && game.snake_velocity-0.5f > 0.0f) {
+                game.snake_velocity -= 0.5f;
+            }
+            else if (IsKeyPressed(KEY_KP_ADD)) game.snake_velocity += 0.5f;
+        }
+
         if (game.mstate == RUNNING || game.mstate == SETTINGS_MENU) {
             snake_time_frame += GetFrameTime();
             if (snake_time_frame >= 1.0f) {
@@ -186,17 +199,13 @@ static void print_tail_pos(game_t game) {
 }
 
 void update_timer(seesnake_time_t* timer) {
-    if (timer->secs != 59) {
-        ++timer->secs;
-    } else {
+    if (timer->secs != 59) ++timer->secs;
+    else {
         timer->secs = 0;
-        if (timer->mins != 59) {
-            ++timer->mins;
-        } else {
+        if (timer->mins != 59) ++timer->mins; 
+        else {
             timer->mins = 0;
-            if (timer->hours != 23) {
-                ++timer->hours;
-            }
+            if (timer->hours != 23) ++timer->hours;
         }
     }
 }
