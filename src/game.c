@@ -129,11 +129,6 @@ void update_game(game_t* game, game_event_t event) {
     else if (event & EVENT_CHANGE_MOVE_LEFT) change_snake_direction_left(game);
     else if (event & EVENT_CHANGE_MOVE_RIGHT) change_snake_direction_right(game);
 
-    if (event & EVENT_DECREASE_SNAKE_VEL && game->snake_velocity-0.5f > 0.0f) {
-        game->snake_velocity -= 0.5f;
-    }
-    else if (event & EVENT_INCREASE_SNAKE_VEL) game->snake_velocity += 0.5f;
-
     if (event & EVENT_HEAD_TAIL_COLLISION) {
         TraceLog(LOG_INFO, "Game over!\n");
         TraceLog(LOG_INFO, "Your score: %d\n", game->score);
@@ -153,9 +148,6 @@ void update_game(game_t* game, game_event_t event) {
 }
 
 void get_game_event(game_t game, game_event_t* event) {
-    if (IsKeyPressed(KEY_KP_ADD)) *event |= EVENT_INCREASE_SNAKE_VEL;
-    else if (IsKeyPressed(KEY_KP_SUBTRACT)) *event |= EVENT_DECREASE_SNAKE_VEL;
-
     if (IsKeyPressed(KEY_UP)) *event |= EVENT_CHANGE_MOVE_UP;
     else if (IsKeyPressed(KEY_LEFT)) *event |= EVENT_CHANGE_MOVE_LEFT;
     else if (IsKeyPressed(KEY_RIGHT)) *event |= EVENT_CHANGE_MOVE_RIGHT;
