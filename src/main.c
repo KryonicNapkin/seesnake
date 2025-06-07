@@ -8,43 +8,46 @@
  *                         It is set to the constant game speed of 60FPS
  *                Removed: EVENTS in the include/game_events.h that handled the change of speed from the game events
  *
- *     Upcomming version: 1.0.2-beta
- *     Changelog: Added: You can see your version number in the title screen
- *                       End screen - Press 'r' to restart
- *                Removed: Text: "DEMO!!!" and "Work in progress..." 
+ *     Upcomming version: 1.1.0-beta
+ *     Changelog: Added: You can see your version number in the title screen x
+ *                       End screen x
+ *                       You can use WASD keys to control your snake x
+ *                       CRACOL (CRAzy COLors) Find the button! x
+ *                Removed: Text: "DEMO!!!" and "Work in progress..." x
+ *                Changed: Updated the ruies.h library x
+ *                         Refactor the whole codebase x
+ *                         Now using only one font instead of four so the filesize of the executable is smaller x
+ *                         The game proportions have been changed significantly x
+ *               
+ *               And a lot of smaller improvements!!
  *                       
  */
+
+/* 
+ * Started work on the end screen
+ */
 #include <stdio.h>
-#include <stdlib.h>
 #include <time.h>
 
 #include "raylib.h"
-#include "raymath.h"
 
-#define USE_CUSTOM_FONT
+#define RUIES_USE_CUSTOM_FONT
 #define RUIES_IMPLEMENTATION
 #include "../lib/ruies.h"
 
+#include "../include/theme.h"
 #include "../include/game_screens.h"
-#include "../include/game.h"
+#include "../include/grid.h"
 #include "../include/snake.h"
+#include "../include/game.h"
 
-#include "../include/fonts/author_font.h"
-#include "../include/fonts/elem_font.h"
-#include "../include/fonts/title_font.h"
-#include "../include/fonts/font.h"
+#include "../include/font.h"
 
 #define STATS_SPACE 25.0f
-typedef struct SeeSnakeTime {
-    unsigned long secs;
-    unsigned long mins;
-    unsigned long hours;
-} seesnake_time_t;
 
-static void print_tail_pos(game_t game);
-void update_timer(seesnake_time_t* timer);
+static void print_tail_pos(snake_t* snake);
+void do_the_crazy(game_theme_t* theme);
 
-void update_draw_frame(void);
 int main(int argc, char* argv[]) {
     const char* title_text = "SeeSnake";
     InitWindow(WIN_WIDTH, WIN_HEIGHT, title_text);
@@ -52,160 +55,103 @@ int main(int argc, char* argv[]) {
 
     SetTargetFPS(60);
 
-    seesnake_time_t snake_time = {0L};
-    /* bool player_board = false;
-    if (!FileExists(PLAYERS_STATS_FILENAME)) {
-        create_players(PLAYERS_STATS_FILENAME, 8);
-    }
-    player_t* players = load_players_data(PLAYERS_STATS_FILENAME);
-    if (players == NULL) {
-        TraceLog(LOG_ERROR, "Cannot load players data!\n");
-        goto free_players;
-    } */
-    /* Font title_font = LoadFontEx(TITLE_FONT_PATH, TITLE_FONT_SIZE, NULL, 0);
-    Font author_font = LoadFontEx(AUTHOR_FONT_PATH, AUTHOR_FONT_SIZE, NULL, 0);
-    Font button_font = LoadFontEx(ELEM_FONT_PATH, ELEM_FONT_SIZE, NULL, 0);
-    Font font = LoadFontEx(FONT_PATH, FONT_SIZE, NULL, 0); */
+    game_theme_t theme = get_default_theme();
+    game_theme_t orig_theme = theme;
 
-    Font author_font = LoadFont_AuthorFont();
-    Font title_font = LoadFont_TitleFont();
-    Font button_font = LoadFont_ElemFont();
-    Font font = LoadFont_Font();
-
-    ruies_load_custom_font(button_font, ELEM_FONT_SIZE);
-    set_global_style(BUTTON_GRID, ATTR_BORDER_WIDTH, BORDER_WIDTH);
-    Rectangle button_bounds = {BUTTON_SPACING, 400, 300, 75};
-    const char* text[] = {"Start game", "Settings", "Quit game", NULL};
-    Ruies_ButtonGrid_t btn_grid = make_button_grid(BUTTON_SPACING, WIN_HEIGHT-BUTTON_SPACING-button_bounds.height, 1, 3, RUIES_RECT(button_bounds), text, 150, 0);
-    if (check_ruies_error()) {
-        TraceLog(LOG_INFO, "Error");
-        exit(1);
-    }
-
-    grid_alignment_t gridalign = TOPLEFT;
-    Vector2 grid_pos = get_grid_pos(CELL_SIZE, GRID_ROWS, GRID_COLS, BORDER_WIDTH, CELL_SPACING, gridalign);
-    Vector2 grid_dim = get_grid_dim(CELL_SIZE, GRID_ROWS, GRID_COLS, BORDER_WIDTH, CELL_SPACING);
-    Vector2 score_pos = {
-        .x = grid_dim.x+(2.0f*grid_pos.x),
-        .y = grid_pos.y,
-    };
-    Vector2 paused_dims = {
-        .x = WIN_WIDTH/3.0f,
-        .y = WIN_HEIGHT/3.0f,
-    };
-    Vector2 paused_pos = {
-        .x = (WIN_WIDTH-paused_dims.x)/2.0f,
-        .y = (WIN_HEIGHT-paused_dims.y)/2.0f,
-    };
-
-    game_event_t event = 0x00;
-    int tail_lenght = INIT_TAIL_LEN;
-    game_t game = {0};
-    init_game(&game, Vector2AddValue(grid_pos, (float)BORDER_WIDTH+CELL_SPACING), (Vector2){CELL_SIZE, CELL_SIZE}, tail_lenght, 10.0f);
+    ruies_load_custom_font(theme.default_font, theme.font_size);
+    set_global_style_attr(ATTR_BORDER_WIDTH, ELEM_BORDER_WIDTH);
 
     SetRandomSeed(time(NULL));
-    set_random_snake_spawn(&game, 5);
-    set_random_snake_direction(&game);
-    set_snake_tail(&game, game.snake_head_direction);
-    set_random_food_spawn(&game);
 
-    const char* demo_text = "DEMO!!!";
-    Vector2 demo_text_pos = {
-        .x = (WIN_WIDTH-MeasureTextEx(font, demo_text, FONT_SIZE, 0).x)/2.0f,
-        .y = (WIN_HEIGHT-MeasureTextEx(font, demo_text, FONT_SIZE, 0).y)/2.0f,
-    };
+    game_event_t event = 0x00;
 
-    const char* settings_text = "Work in progress...";
-    Vector2 text_pos = {
-        .x = (WIN_WIDTH-MeasureTextEx(font, settings_text, FONT_SIZE, 0).x)/2.0f,
-        .y = (WIN_HEIGHT-MeasureTextEx(font, settings_text, FONT_SIZE, 0).y)/2.0f,
-    };
+    snake_game_grid_t* grid = grid_make(GRID_SIZE, CELL_SIZE, CELL_SPACING_PX, GRID_BORDER_WIDTH);
+    snake_t* snake = snake_make(TAIL_LENGHT, SNAKE_VELOCITY, GRID_SIZE);
+    game_t* game = NULL;
+
+    game_init(&game, grid, snake, theme);
 
     #ifdef DEBUG
-    printf("Current facing direction: %d\n", game.snake_head_direction);
+    TraceLog(LOG_INFO, "Current facing direction: %d", snake->head_direction);
     #endif
+
+    Ruies_Rect_t cracol_bounds = {
+        .x = (2.0f*ELEM_BORDER_WIDTH)+1, 
+        .y = WIN_HEIGHT-(2.0f*((2.0f*ELEM_BORDER_WIDTH)+1)), 
+        .width = (2.0f*ELEM_BORDER_WIDTH)+1, 
+        .height = (2.0f*ELEM_BORDER_WIDTH)+1
+    };
+    Ruies_Button_t cracol_button = make_button(cracol_bounds, "");
+    Ruies_ElemState_t cracol_state;
+    long val = 0;
+
     float frame_time = 0.0f; 
     float snake_time_frame = 0.0f; 
-    while (!WindowShouldClose() && game.current_action != QUIT_GAME) {
-        if (game.mstate == PAUSED || game.mstate == RUNNING) {
+    while (!WindowShouldClose() && !game->quit) {
+        if (game->state == PAUSED || game->state == RUNNING) {
             if (IsKeyPressed(KEY_SPACE)) {
-                if (game.mstate == PAUSED) game.mstate = RUNNING;
-                else game.mstate = PAUSED;
+                if (game->state == PAUSED) game->state = RUNNING;
+                else game->state = PAUSED;
             }
         }
-        if (game.mstate != PAUSED && game.mstate == RUNNING) {
-            if (IsKeyPressed(KEY_KP_SUBTRACT) && game.snake_velocity-0.5f > 0.0f) {
-                game.snake_velocity -= 0.5f;
+        if (game->state == RUNNING) {
+            if (IsKeyPressed(KEY_KP_SUBTRACT) && game->snake->velocity-0.5f > 0.0f) {
+                game->snake->velocity -= 0.5f;
             }
-            else if (IsKeyPressed(KEY_KP_ADD)) game.snake_velocity += 0.5f;
+            else if (IsKeyPressed(KEY_KP_ADD)) game->snake->velocity += 0.5f;
         }
 
-        if (game.mstate == RUNNING || game.mstate == SETTINGS_MENU) {
+        if (game->state == RUNNING) {
             snake_time_frame += GetFrameTime();
             if (snake_time_frame >= 1.0f) {
-                update_timer(&snake_time);
+                game->game_time_s++;
                 snake_time_frame = 0.0f;
             }
             get_game_event(game, &event);
             frame_time += GetFrameTime();
-            if (frame_time >= (1.0f/game.snake_velocity)) {
+            if (frame_time >= (1.0f/game->snake->velocity)) {
                 update_game(&game, event);
-                unset_unused_tail_directions(&game);
+                unset_unused_tail_directions(&game->snake, &game->grid);
                 event = 0x00;
                 frame_time = 0.0f;
             }
         }
+
         BeginDrawing();
         {
-            ClearBackground(COLOR_BG);
-            if (game.mstate == MAIN_MENU) {
-                draw_title_screen(title_font, author_font, btn_grid, &game.next_action);
-                DrawTextEx(font, demo_text, demo_text_pos, FONT_SIZE, 0, RED);
-            }
-            if (game.mstate == SETTINGS_MENU) {
-                DrawTextEx(font, settings_text, text_pos, FONT_SIZE, 0, COLOR_FG);
-            }
-            if (game.mstate != MAIN_MENU && game.mstate != SETTINGS_MENU) {
-                draw_game_title(grid_pos, grid_dim, title_text, font);
-                DrawTextEx(font, TextFormat("SCORE: %ld", game.score), score_pos, FONT_SIZE, 0, COLOR_FG);
-                DrawTextEx(font, TextFormat("Tail lenght: %d", game.tail_lenght), 
-                           (Vector2){score_pos.x, score_pos.y+STATS_SPACE}, FONT_SIZE, 0, COLOR_FG);
-                DrawTextEx(font, TextFormat("Time: %02d:%02d:%02d", snake_time.hours, snake_time.mins, snake_time.secs),
-                           (Vector2){score_pos.x, score_pos.y+(2.0f*STATS_SPACE)}, FONT_SIZE, 0, COLOR_FG);
-                DrawTextEx(font, TextFormat("Speed: %.2fcells/sec", game.snake_velocity), 
-                           (Vector2){score_pos.x, score_pos.y+(3.0f*STATS_SPACE)}, FONT_SIZE, 0, COLOR_FG);
-    /*             draw_player_board(players); */
-                render_game_grid(game, grid_pos, grid_dim);
-                if (game.mstate == PAUSED) {
-                    draw_pause_box(paused_pos, paused_dims, font, "PAUSED", BORDER_WIDTH);
+            ClearBackground(game->theme.colors[COLOR_BACKGROUND]);
+            if (game->state == MAIN_MENU) {
+                draw_title_screen(&game->action, game->theme);
+            } else if (game->state == RUNNING) {
+                draw_game_title(game->grid->pos, game->grid->dims, title_text, game->theme);
+                draw_stats(game, game->theme);
+
+                if (render_button(&cracol_button, &cracol_state)) {
+                    change_theme_color(&game->theme, val % NUM_OF_COLORS, game->theme.colors[(val+1) % NUM_OF_COLORS]);
+                    val++;
+                } else if (cracol_state == FOCUSED && IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
+                    val = 0;
+                    game->theme = orig_theme;
                 }
+                
+                game_render(game);
+            } else if (game->state == PAUSED) {
+                draw_pause_box(game->theme.default_font, GRID_BORDER_WIDTH, game->theme);
+            } else if (game->state == END_SCREEN) {
+                draw_end_game_screen(game->score, game->game_time_s, &game->action, game->theme);
             }
         }
         EndDrawing();
+
         update_game_according_to_action(&game);
     }
     CloseWindow();
-    free(game.tail_cell_nums);
-    free(game.tail_directions);
+    game_free(game);
     return 0;
-    /* free_players:
-        free(players); */
 }
 
-static void print_tail_pos(game_t game) {
-    for (int i = 0; i < game.tail_lenght; ++i) {
-        printf("Tail[%d]: cell_num: %d\n", i, game.tail_cell_nums[i]);
-    }
-}
-
-void update_timer(seesnake_time_t* timer) {
-    if (timer->secs != 59) ++timer->secs;
-    else {
-        timer->secs = 0;
-        if (timer->mins != 59) ++timer->mins; 
-        else {
-            timer->mins = 0;
-            if (timer->hours != 23) ++timer->hours;
-        }
+static void print_tail_pos(snake_t* snake) {
+    for (int i = 0; i < snake->tail_lenght; ++i) {
+        printf("Tail[%d]: cell_num: %d\n", i, snake->tail_cell_nums[i]);
     }
 }

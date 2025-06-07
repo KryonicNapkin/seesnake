@@ -1,45 +1,54 @@
 /* 
- * ruies.h is a simple header-only library that adds some ui elements to 
- * 
- * be used in raylib applications
+ * ruies.h is a simple header-only library that adds some ui elements be used in raylib applications
+ *
+ * Ruies v1.0 - finalized 
+ *     - A lot of missing functionality and a lot of bugs
+ *     - use it only for testing
+ *
  *                                                      GITHUB
- *     Created by: KryonicNapkin        - https://www.github.com/KryonicNapkin/rlui_elems
+ *     Created by: KryonicNapkin        - https://www.github.com/KryonicNapkin/ruies.h
  *     Credit: raysan5's raygui library - https://www.github.com/raysan5/raygui
  */
-/* NOTE: To use this library you NEED to have raylib.h included prior */
+
+/* NOTE: You NEED to include raylib.h before including this library */
 
 /* 
  * TODO: 1. Make more elements (
- *              CheckBox, 
+ *              CheckBox -- DONE, 
  *              OptionList, 
- *              Slider, 
+ *              Slider -- PAUSED, 
  *              ProgressBar, 
- *              WindowBox,  -- In progress
- *              TabPane, 
+ *              WindowBox,  -- DONE
+ *              TabPane,
  *              TitlebarButtons, 
  *              HeaderBar,
+ *              DropDown,
  *              ...
  *          )
- *       2. Rework the style system (
+ *       2. Special element - Ruies_Indicator_t -- DONE
+ *       3. Rework the style system (
  *              Loading a custom style for different Elements,
- *              Do something with fonts,
- *              
+ *              Do something with fonts, -- DONE
  *          )
- *
- *
+ *       4. Rework inscribing elements into cellbox !!!
+ *       5. Refactor some rendering functions
+ *       6. Let the user change the shape of checkbox when clicked 
+ *       7. Add functions to deal with text+padding
  */
 
-/* ELEMENTS include: Button, Button grid, Titlebar, Toggle, Label */
+/* ELEMENTS include: Button, Button grid, Titlebar, Toggle, Label, CellBox, WindowBox, CheckBox */
 
 #ifndef RUIES_H_
 #define RUIES_H_
 
 #include <stdint.h>                     /* For type compatibility */
+#include <stddef.h>                     /* NULL pointer */
 
-#ifndef USE_CUSTOM_FONT
+/* #include "raylib.h" */
+#ifndef RUIES_USE_CUSTOM_FONT
 /* Default font */
 
-////////////////////////////////////////////////////////////////////////////////////////                                                                                    //
+////////////////////////////////////////////////////////////////////////////////////////
 //                                                                                    //
 // Font name:    PixeloidSans-mLxMn.ttf                                               //
 // Font creator: GGBotNet                                                             //
@@ -47,11 +56,11 @@
 //                                                                                    //
 ////////////////////////////////////////////////////////////////////////////////////////
 
-#define COMPRESSED_DATA_SIZE_FONT_TEST 6688
+#define COMPRESSED_DATA_SIZE_DEFAULT_FONT 6688
 
 // Font image pixels data compressed (DEFLATE)
 // NOTE: Original pixel data simplified to GRAYSCALE
-static unsigned char default_font_data[COMPRESSED_DATA_SIZE_FONT_TEST] = { 0xed,
+static unsigned char default_font_data[COMPRESSED_DATA_SIZE_DEFAULT_FONT] = { 0xed,
     0x9d, 0x3f, 0x88, 0x1b, 0x47, 0xdf, 0xc7, 0x85, 0x31, 0xc1, 0x70, 0x98, 0x70, 0x98, 0xe3, 0xb8, 0x26, 0x84, 0x2b, 0x5c,
     0x1c, 0x41, 0x8d, 0x49, 0x11, 0x82, 0x09, 0x0f, 0x86, 0x2b, 0x82, 0x0b, 0x17, 0x47, 0x20, 0x98, 0xc3, 0x45, 0x30, 0xc1,
     0x9d, 0x09, 0xe2, 0x38, 0x4c, 0x30, 0x18, 0x63, 0xcc, 0x21, 0x42, 0x9a, 0x23, 0x18, 0x93, 0x22, 0x88, 0x10, 0x30, 0x2e,
@@ -467,7 +476,7 @@ static GlyphInfo default_font_glyphs[189] = {
     { 217, 0, -1, 13, { 0 }}, { 218, 0, -1, 13, { 0 }}, { 219, 0, -1, 13, { 0 }}, { 220, 0, -1, 13, { 0 }},
 };
 
-// Font loading function: Test
+// Font loading function: DefaultFont
 static Font RuiesLoadDefaultFont(void) {
     Font font = { 0 };
 
@@ -478,7 +487,7 @@ static Font RuiesLoadDefaultFont(void) {
     // Custom font loading
     // NOTE: Compressed font image data (DEFLATE), it requires DecompressData() function
     int default_font_data_size = 0;
-    unsigned char *data = DecompressData(default_font_data, COMPRESSED_DATA_SIZE_FONT_TEST, &default_font_data_size);
+    unsigned char *data = DecompressData(default_font_data, COMPRESSED_DATA_SIZE_DEFAULT_FONT, &default_font_data_size);
     Image imFont = { data, 512, 256, 1, 2 };
 
     // Load texture from image
@@ -492,10 +501,10 @@ static Font RuiesLoadDefaultFont(void) {
 
     return font;
 }
-#endif /* ifndef USE_CUSTOM_FONT */
+#endif /* ifndef RUIES_USE_CUSTOM_FONT */
 
-#define MAX_ELEMENTS_COUNT     7
-#define MAX_ELEMENT_ATTRIBUTES 19
+#define MAX_ELEMENTS_COUNT     9
+#define MAX_ELEMENT_ATTRIBUTES 17
 
 typedef struct {
     uint32_t elem_styles[MAX_ELEMENTS_COUNT][MAX_ELEMENT_ATTRIBUTES];
@@ -512,43 +521,43 @@ typedef struct {
 } Ruies_Rect_t;
 
 typedef struct {
+    float x;
+    float y;
+} Ruies_Vec2_t;
+
+typedef struct {
     unsigned char r;
     unsigned char g;
     unsigned char b;
     unsigned char a;
 } Ruies_Color_t; 
 
-typedef struct {
-    float x;
-    float y;
-} Ruies_Vec2_t;
+#define RUIES_LOG_RECT(rect)       (fprintf(stdout, "-- RUIES: x: %f, y: %f, width: %f, height: %f\n", rect.x, rect.y, rect.width, rect.height))
+#define RUIES_LOG_VEC(vec)         (fprintf(stdout, "-- RUIES: x: %f, y: %f\n", vec.x, vec.y))
+#define RUIES_LOG_STATE(e)         (fprintf(stdout, "-- RUIES: state: %d\n", e.state))
 
-#define RUIES_RECT(rayrect)      ((Ruies_Rect_t){.x = rayrect.x, .y = rayrect.y, .width = rayrect.width, .height = rayrect.height})
-#define RUIES_COLOR(raycolor)    ((Ruies_Color_t){.r = raycolor.r, .g = raycolor.g, .b = raycolor.b, .a = raycolor.a})
-#define RUIES_VEC2(rayvec2)      ((Ruies_Vec2_t){.x = rayvec2.x, .y = rayvec2.y})
+#define RUIES_RECT(rayrect)        ((Ruies_Rect_t){.x = rayrect.x, .y = rayrect.y, .width = rayrect.width, .height = rayrect.height})
+#define RUIES_COLOR(raycolor)      ((Ruies_Color_t){.r = raycolor.r, .g = raycolor.g, .b = raycolor.b, .a = raycolor.a})
+#define RUIES_VEC2(rayvec2)        ((Ruies_Vec2_t){.x = rayvec2.x, .y = rayvec2.y})
+#define RUIES_VEC_POSRECT(rect)    ((Ruies_Vec2_t){.x = rect.x, .y = rect.y})
+#define RUIES_VEC_DIMSRECT(rect)   ((Ruies_Vec2_t){.x = rect.width, .y = rect.height})
+#define RUIES_CENTERPOINT(rect)    ((Ruies_Vec2_t){.x = rect.x+(rect.width/2.0f), .y = rect.y+(rect.height/2.0f)})
 
-#define RAYLIB_RECT(ruiesrect)   ((Rectangle){.x = ruiesrect.x, .y = ruiesrect.y, .width = ruiesrect.width, .height = ruiesrect.height})
-#define RAYLIB_COLOR(ruiescolor) ((Color){.r = ruiescolor.r, .g = ruiescolor.g, .b = ruiescolor.b, .a = ruiescolor.a})
-#define RAYLIB_VEC2(ruiesvec2)   ((Vector2){.x = ruiesvec2.x, .y = ruiesvec2.y})
-#define VEC2ADDVALUE(v, val)     ((Ruies_Vec2_t){.x = v.x + (float)val, .y = v.y + (float)val})
-#define VEC2SUBVALUE(v, val)     ((Ruies_Vec2_t){.x = v.x - (float)val, .y = v.y - (float)val})
-#define HEX2RUIESCOLOR(hexval)   \
-    ({                                                      \
-        (Ruies_Color_t) {                                   \
-            .r = (unsigned char)((hexval >> 24) & 0xFF),    \
-            .g = (unsigned char)((hexval >> 16) & 0xFF),    \
-            .b = (unsigned char)((hexval >> 8) & 0xFF),     \
-            .a = (unsigned char)((hexval) & 0xFF),          \
-        };                                                  \
-    })
+#define RAYLIB_RECT(ruiesrect)     ((Rectangle){.x = ruiesrect.x, .y = ruiesrect.y, .width = ruiesrect.width, .height = ruiesrect.height})
+#define RAYLIB_COLOR(ruiescolor)   ((Color){.r = ruiescolor.r, .g = ruiescolor.g, .b = ruiescolor.b, .a = ruiescolor.a})
+#define RAYLIB_VEC2(ruiesvec2)     ((Vector2){.x = ruiesvec2.x, .y = ruiesvec2.y})
+/* Some math operations */
+#define VEC2ADDVALUE(v, val)       ((Ruies_Vec2_t){.x = v.x + (float)(val), .y = v.y + (float)(val)})
+#define VEC2SUBVALUE(v, val)       ((Ruies_Vec2_t){.x = v.x - (float)(val), .y = v.y - (float)(val)})
+#define TOPLEFTRECTPOINT(rect)     ((Ruies_Vec2_t){.x = rect.x, .y = rect.y})
+#define TOPRIGHTRECTPOINT(rect)    ((Ruies_Vec2_t){.x = rect.x + rect.width, .y = rect.y})
+#define BOTTOMLEFTRECTPOINT(rect)  ((Ruies_Vec2_t){.x = rect.x, .y = rect.y + rect.height})
+#define BOTTOMRIGHTRECTPOINT(rect) ((Ruies_Vec2_t){.x = rect.x + rect.width, .y = rect.y + rect.height})
+#define RECTWITHBORDER(rect, bw)   ((Ruies_Rect_t){.x = rect.x + ((float)bw), .y = rect.y + ((float)bw), .width = rect.width - (2.0f*((float)bw)), .height = rect.height - (2.0f*((float)bw))})
 
+#define RUIES_ERROR_OUT()          ({(__ruies_error) = 1; return;})
 
-typedef int64_t Ruies_ElemID_t;
-
-typedef enum {
-    NORMAL_BORDER = 0,
-    DOUBLE_BORDER,
-} Ruies_WindowBoxStyles_t;
+typedef int32_t Ruies_ElemID_t;
 
 typedef enum {
     BUTTON = 0,
@@ -558,7 +567,8 @@ typedef enum {
     LABEL,
     CELLBOX,
     WINBOX,
-    ALL_ELEMENTS,
+    CHECKBOX,
+    INDICATOR,
 } Ruies_ElementTypes_t;
 
 typedef enum {
@@ -566,6 +576,7 @@ typedef enum {
     FOCUSED,
     CLICKED,
 } Ruies_ElemState_t;
+
 /* Text alignment */
 typedef enum {
     ALIGN_LEFT = 0,
@@ -574,19 +585,30 @@ typedef enum {
 } Ruies_TextAlignment_t;
 
 typedef enum {
-    TO_THE_LEFT = 0,
-    TO_THE_RIGHT,
-    ON_TOP,
-    TO_BOTTOM
+    NORMAL_BORDER = 0,
+    DOUBLE_BORDER,
+} Ruies_WindowBoxStyles_t;
+
+typedef enum {
+    ATTACH_LEFT = 0,
+    ATTACH_RIGHT,
+    ATTACH_TOP,
+    ATTACH_BOTTOM
 } Ruies_ElemAttachment_t;
 
 typedef enum {
     LEFT_SIDE = 0,
     RIGHT_SIDE,
-    TOP,
-    BOTTOM,
-} Ruies_CellBoxSides_t;
+    UP,
+    DOWN,
+} Ruies_Sides_t;
 
+typedef enum {
+    TEXT_LEFT = 0,
+    TEXT_RIGHT,
+    TEXT_UP,
+    TEXT_DOWN
+} Ruies_TextPlacement_t;
 
 /* Button attributes for the button_grid function */
 typedef enum {
@@ -610,11 +632,16 @@ typedef enum {
     ATTR_TOP_PADDING,
     ATTR_BOTTOM_PADDING,
 
-    ATTR_TITLEBAR_TOP_BORDER_WIDTH,
-    ATTR_TITLEBAR_BOTTOM_BORDER_WIDTH,
-    ATTR_TITLEBAR_LEFT_BORDER_WIDTH,
-    ATTR_TITLEBAR_RIGHT_BORDER_WIDTH,
+    ATTR_RECT_MARGIN,
+    ATTR_BORDER_GAP,
 } Ruies_ElemAttr_t;
+
+/* Numbers explictly marked down for the compatibility with Ruies_ElemState_t type*/
+typedef enum {
+    INDICATOR_OFF = 0,
+    INDICATOR_ON = 2,
+    INDICATOR_BLINKING = 3,
+} Ruies_IndicatorState_t;
 
 /*------------------------------------------------------------*/
 /*----------------------    ELEMENTS    ----------------------*/
@@ -629,6 +656,7 @@ typedef struct {
     float font_size;
     uint32_t style[MAX_ELEMENT_ATTRIBUTES];
     Ruies_ElemState_t state;
+    bool is_inscribed_in_cell;
 } Ruies_Button_t;
 
 /* ButtonGrid structure */
@@ -652,6 +680,12 @@ typedef struct {
     Font font;
     float font_size;
     uint32_t style[MAX_ELEMENT_ATTRIBUTES];
+    struct {
+        uint32_t left_border_width;
+        uint32_t right_border_width;
+        uint32_t top_border_width;
+        uint32_t bottom_border_width;
+    } border_widths;
 } Ruies_TitleBar_t;
 
 /* Toggle structure */
@@ -663,6 +697,7 @@ typedef struct {
     float font_size;
     uint32_t style[MAX_ELEMENT_ATTRIBUTES];
     Ruies_ElemState_t state;
+    bool is_inscribed_in_cell;
 } Ruies_Toggle_t;
 
 typedef struct {
@@ -674,33 +709,65 @@ typedef struct {
     uint32_t style[MAX_ELEMENT_ATTRIBUTES];
     bool is_attached;
     Ruies_ElemAttachment_t attach_to;
+    bool is_inscribed_in_cell;
 } Ruies_Label_t;
+
+typedef struct {
+    Ruies_Rect_t bounds;
+    int id;
+    bool is_inscribed_elem;
+} Ruies_CellBoxCell_t;
 
 typedef struct {
     Ruies_ElemID_t id;
     Ruies_Rect_t bounds;
     uint32_t cell_rows;
     uint32_t cell_cols;
+    uint32_t num_of_cells;
     uint32_t cell_margin;
-    Ruies_Rect_t* cell_bounds;
-    int* cell_ids;
+    Ruies_CellBoxCell_t* cells;
     int number_of_inscribed_elems;
 } Ruies_CellBox_t;
 
 typedef struct {
     Ruies_ElemID_t id;
     Ruies_Rect_t bounds;
-    Ruies_Color_t border_color;
-    Ruies_Color_t base_color;
-    uint32_t border_width;
+    uint32_t style[MAX_ELEMENT_ATTRIBUTES];
     Ruies_ElemState_t state;
     Ruies_WindowBoxStyles_t border_style;
-    uint32_t border_gap;
 } Ruies_WindowBox_t;
 
-/*------------------------------------------------------------*/
-/*----------------------    TYPEDEFS    ----------------------*/
-/*------------------------------------------------------------*/
+typedef struct {
+    Ruies_ElemID_t id;
+    Ruies_Rect_t bounds;
+    uint32_t style[MAX_ELEMENT_ATTRIBUTES];
+    char* text;
+    Font font;
+    float font_size;
+    Ruies_TextPlacement_t text_pos;
+    Ruies_ElemState_t state;
+    bool is_inscribed_in_cell;
+} Ruies_CheckBox_t;
+
+typedef struct {
+    Ruies_ElemID_t id;
+    Ruies_Vec2_t pos;
+    float radius;
+    uint32_t style[MAX_ELEMENT_ATTRIBUTES];
+    char* text;
+    Font font;
+    float font_size;
+    Ruies_TextPlacement_t text_placement;
+    Ruies_IndicatorState_t state;
+    float blink_interval;               /* times per sec */
+} Ruies_Indicator_t;
+
+typedef struct {
+    uint32_t from_left;
+    uint32_t from_right;
+    uint32_t from_top;
+    uint32_t from_bottom;
+} Ruies_Padding_t;
 
 /* Default values for the global style */
 #define BORDER_COLOR_NORMAL  0x282C34FF
@@ -714,30 +781,23 @@ typedef struct {
 #define TEXT_COLOR_CLICKED   0x282C34FF 
 
 #define NO_COLOR_VALUE       0x00000000
-#define UNDEFINED_COLOR(hex) (!(hex) ? 1 : 0)     
 
 #define __BORDER_WIDTH       1
 
-#ifndef USE_CUSTOM_FONT
-#define RUIES_FONT_FONT      RuiesLoadDefaultFont()
-#define RUIES_FONT_SIZE      25                      /* Set font size */
+#ifndef RUIES_USE_CUSTOM_FONT
+    #define RUIES_FONT       RuiesLoadDefaultFont()
+    #define RUIES_FONT_SIZE  25                      /* Set font size */
 #endif
 
-#define RUIES_FONT           ((Font){0})
-
-/*
- NOTE: If it's 0 than that means no error 
- *     If it's other than 0 that means error 
- *     You can check the value of using function check_rlui_error()
- * 
-*/
+#define EMPTY_FONT           ((Font){0})
 
 /*-------------------------------------------------------------*/
 /*-----------------   FUNCTION DECLARATIONS   -----------------*/
 /*-------------------------------------------------------------*/
 
-#ifndef USE_CUSTOM_FONT
+#ifndef RUIES_USE_CUSTOM_FONT
     void ruies_load_default_font(void);
+    Font ruies_extract_default_font(void);
 #else 
     void ruies_load_custom_font(Font font, float font_size);
 #endif
@@ -752,75 +812,81 @@ Ruies_TitleBar_t make_titlebar(Ruies_Rect_t bounds, const char* text);
 /* NOTE: This function allocates memory for the buttons on the heap! 
  * You should call free_button_grid() after CloseWindow() */
 Ruies_ButtonGrid_t make_button_grid(uint32_t posx, uint32_t posy, uint32_t rows, uint32_t cols,
-                                Ruies_Rect_t sample_bounds, const char* text[],
-                                uint32_t horizontal_spacing, uint32_t vertical_spacing);
+                                    Ruies_Rect_t sample_bounds, const char* text[],
+                                    uint32_t horizontal_spacing, uint32_t vertical_spacing);
 Ruies_Toggle_t make_toggle(Ruies_Rect_t bounds, const char* text);
 Ruies_Label_t make_label(Ruies_Rect_t bounds, const char* text, uint32_t left_padding, uint32_t right_padding);
 Ruies_CellBox_t make_cellbox(Ruies_Rect_t bounds, uint32_t rows, uint32_t cols, uint32_t cell_margin);
-Ruies_WindowBox_t make_window_box(Ruies_Rect_t bounds, Ruies_WindowBoxStyles_t border_style, 
-                                   uint32_t border_width, uint32_t border_gap);
+Ruies_WindowBox_t make_winbox(Ruies_Rect_t bounds, Ruies_WindowBoxStyles_t border_style);
+Ruies_CheckBox_t make_checkbox(Ruies_Vec2_t pos, float square_size, const char* text, Ruies_TextPlacement_t text_atached_to);
+Ruies_Indicator_t make_indicator(Ruies_Vec2_t center_pos, float radius, const char* text, Ruies_TextPlacement_t text_pos, Ruies_IndicatorState_t init_state);
+
+/* Indicator manipulation functions */
+void set_indicator_on(Ruies_Indicator_t* indicator);
+void set_indicator_off(Ruies_Indicator_t* indicator);
+void set_indicator_onoff(Ruies_Indicator_t* indicator);
+void set_indicator_blink(Ruies_Indicator_t* indicator, float blink_interval);
  
 /* Cellbox releated functions */
-void merge_neighbouring_cells(Ruies_CellBox_t* cellbox, Ruies_CellBoxSides_t side, int idx1);
-void split_cell_horizontaly(Ruies_CellBox_t* cellbox, int idx);
-void split_cell_verticaly(Ruies_CellBox_t* cellbox, int idx);
-void inscribe_elem_into_cell(const void* elem, Ruies_ElementTypes_t type, Ruies_CellBox_t* cellbox, int cell_id);
-/* void inscribe_elem_into_cell_relative_side(const void* elem, ElementTypes_t type, CellBox_t* cellbox, cellbox_sides_t from, int how_much, int vertical_pos); */
+int cell_pos_cellbox(Ruies_CellBox_t cellbox, int id);
+void inscribe_button_into_cell(Ruies_Button_t* button, Ruies_CellBox_t* cellbox, int cell_idx);
+void inscribe_toggle_into_cell(Ruies_Toggle_t* toggle, Ruies_CellBox_t* cellbox, int cell_idx);
 void insert_cellbox_into_window_box(Ruies_CellBox_t* cellbox, Ruies_WindowBox_t winbox);
 void set_cellbox_cell_margin(Ruies_CellBox_t* cellbox, uint32_t cell_margin);
-void calculate_cells(Ruies_CellBox_t* cellbox);
+void calculate_cells(Ruies_CellBoxCell_t** cells, Ruies_Rect_t cellbox_bounds, uint32_t cols, uint32_t rows, float cell_margin);
 int relative_cellbox_id(int cols, int x, int y);
 
-/* Additional ways of creating elements */
-Ruies_Button_t make_button_from_button(Ruies_Button_t button, Ruies_Rect_t bounds, const char* text);
-Ruies_Toggle_t make_toggle_from_toggle(Ruies_Toggle_t toggle, Ruies_Rect_t bounds, const char* text);
+void visualize_cells(Ruies_CellBox_t cellbox);
 
 /* Label releated functions */
 void attach_label_to_elem(const void* elem, Ruies_ElementTypes_t type, Ruies_Label_t* label, Ruies_ElemAttachment_t attach_to);
 
 /* Style functions */
-void set_global_style(Ruies_ElementTypes_t elem_type, Ruies_ElemAttr_t attr, uint32_t value);
+void set_elem_style_attr(Ruies_ElementTypes_t elem_type, Ruies_ElemAttr_t attr, uint32_t value);
+void set_global_style_attr(Ruies_ElemAttr_t attr, uint32_t value);
 uint32_t* get_style(Ruies_ElementTypes_t elem, int* size);
 uint32_t get_style_value(Ruies_ElementTypes_t elem, Ruies_ElemAttr_t attr);
 void get_style_colors(Ruies_ElemState_t state, uint32_t* style, Ruies_Color_t* border, Ruies_Color_t* base, Ruies_Color_t* text);
 
 /* Attributes changing functions */
-void set_button_style(Ruies_Button_t* button, Ruies_ElemAttr_t attr, uint32_t value);
-void set_titlebar_style(Ruies_TitleBar_t* titlebar, Ruies_ElemAttr_t attr, uint32_t value);
-void button_grid_attr(Ruies_ButtonGrid_t* grid, Ruies_ElemAttr_t attr, uint32_t value);
-void set_toggle_style(Ruies_Toggle_t* toggle, Ruies_ElemAttr_t attr, uint32_t value);
-void set_label_style(Ruies_Label_t* label, Ruies_ElemAttr_t attr, uint32_t value);
-void set_cellbox_style(Ruies_CellBox_t* cellbox, Ruies_ElemAttr_t attr, uint32_t value);
+void set_button_style_attr(Ruies_Button_t* button, Ruies_ElemAttr_t attr, uint32_t value);
+void set_titlebar_style_attr(Ruies_TitleBar_t* titlebar, Ruies_ElemAttr_t attr, uint32_t value);
+void set_button_grid_style_attr(Ruies_ButtonGrid_t* grid, Ruies_ElemAttr_t attr, uint32_t value);
+void set_toggle_style_attr(Ruies_Toggle_t* toggle, Ruies_ElemAttr_t attr, uint32_t value);
+void set_label_style_attr(Ruies_Label_t* label, Ruies_ElemAttr_t attr, uint32_t value);
+void set_winbox_style_attr(Ruies_WindowBox_t* winbox, Ruies_ElemAttr_t attr, uint32_t value);
+void set_checkbox_style_attr(Ruies_CheckBox_t* checkbox, Ruies_ElemAttr_t attr, uint32_t value);
+void set_indicator_style_attr(Ruies_Indicator_t* indic, Ruies_ElemAttr_t attr, uint32_t value);
 
 /* ButtonGrid alignment functions */
 void stretch_button_grid_horiz(Ruies_ButtonGrid_t* button_grid, uint32_t horizontal_spacing, uint32_t until_x);
 void stretch_button_grid_verti(Ruies_ButtonGrid_t* button_grid, uint32_t vertical_spacing, uint32_t until_y);
 
 /* Rendering functions */
-void render_button(Ruies_Button_t* button);
-void vrender_button(int count, ...);
-void render_button_grid(Ruies_ButtonGrid_t* buttons);
+/* Button rendering function */
+bool render_button(Ruies_Button_t* button, Ruies_ElemState_t* state);
+/* ButtonGrid rendering function */
+bool render_button_grid(Ruies_ButtonGrid_t* button_grid, int button_id, int* ret_id, Ruies_ElemState_t* state);
+/* Titlebar rendering function */
 void render_titlebar(Ruies_TitleBar_t titlebar);
-void render_toggle(Ruies_Toggle_t* toggle);
-void render_label(Ruies_Label_t* label);
-void render_winbox(Ruies_WindowBox_t* winbox);
+/* Toggle rendering function */
+bool render_toggle(Ruies_Toggle_t* toggle, Ruies_ElemState_t* state);
+/* label rendering function */
+void render_label(Ruies_Label_t label);
+/* Button rendering function */
+void render_winbox(Ruies_WindowBox_t* winbox, Ruies_ElemState_t* state);
+/* CheckBox rendering function */
+bool render_checkbox(Ruies_CheckBox_t* checkbox, Ruies_ElemState_t* state);
+/* Indicator rendering function */
+void render_indicator(Ruies_Indicator_t indic, Ruies_IndicatorState_t* state);
 
 /* Internal functions for rendering */
-Ruies_Vec2_t __get_elem_with_border_pos(Ruies_Rect_t bounds, uint32_t border_width);
-Ruies_Vec2_t __get_elem_with_border_dims(Ruies_Rect_t bounds, uint32_t border_width);
+void ruies_draw_rect_with_border(Ruies_Rect_t bounds, uint32_t border_width, Ruies_Color_t border_color, Ruies_Color_t base_color);
 Ruies_Vec2_t __get_elem_text_pos(Ruies_Rect_t bounds, Font font, const char* text);
 Ruies_Vec2_t __get_text_pos_align(Ruies_Rect_t bounds, uint32_t left_padding, uint32_t right_padding, 
-                                    Ruies_TextAlignment_t text_align, Font font, float font_size, const char* text);
-
-/* Functions for getting elements states */
-Ruies_ElemState_t get_button_state(Ruies_Button_t button, bool* active);
-Ruies_ElemState_t get_toggle_state(Ruies_Toggle_t toggle, bool* active);
-Ruies_ElemState_t get_winbox_state(Ruies_WindowBox_t winbox);
-
-/* Functions for changing element states */
-void __detect_button_state_change(Ruies_Button_t* button);
-void __detect_toggle_state_change(Ruies_Toggle_t* toggle);
-void __detect_winbox_state_change(Ruies_WindowBox_t* winbox);
+                                  Ruies_TextAlignment_t text_align, Font font, float font_size, const char* text);
+Ruies_Vec2_t __get_text_placement_pos(Ruies_Rect_t elem_bounds, Ruies_Padding_t padding, Ruies_TextPlacement_t text_placement, 
+                                      Font font, float font_size, const char* text);
 
 int get_button_index_in_grid_by_its_id(Ruies_ButtonGrid_t button_grid, Ruies_ElemID_t id);
 
@@ -829,7 +895,9 @@ void free_button_grid(Ruies_ButtonGrid_t button_grid);
 void free_cellbox(Ruies_CellBox_t cellbox);
 
 /* Miscellaneous functions */
-char* rlui_strdup(const char* str);
+Ruies_Color_t ruies_hex2color(uint32_t hexval);
+uint32_t ruies_color2hex(Ruies_Color_t color);
+char* ruies_strdup(const char* str);
 
 #ifdef RUIES_IMPLEMENTATION
 
@@ -837,92 +905,176 @@ char* rlui_strdup(const char* str);
 #include <stdlib.h>
 #include <string.h>
 
+/* Global variables */
+
+/* if global font is loaded */
+static bool __global_font_loaded = false;
+/* global reserved font */
+static Font __global_reserved_font = {0};
+/*
+ NOTE: If it's 0 than that means no error 
+ *     If it's other than 0 that means error 
+ *     You can check the value of using function check_ruies_error()
+ * 
+*/
 /* custom variable that stores current error */
 static int __ruies_error = 0;
-
 /* variable to keep track of current element id */
-static int __current_elem_idx = 0;
-
+static Ruies_ElemID_t __current_elem_idx = 0;
 /* STYLE DEFINITIONS OF THE ELEMENTS */
 static Ruies_GlobalStyle_t __style = {
     .elem_styles = {
-        /* Button */
-        {
-            BORDER_COLOR_NORMAL,  BASE_COLOR_NORMAL,   TEXT_COLOR_NORMAL,  // state: NORMAL  
-            BORDER_COLOR_FOCUSED, BASE_COLOR_FOCUSED,  TEXT_COLOR_FOCUSED, // state: FOCUSED
-            BORDER_COLOR_CLICKED, BASE_COLOR_CLICKED,  TEXT_COLOR_CLICKED, // state: CLICKED
-            __BORDER_WIDTH, ALIGN_CENTER, 
-            0, 0, 0, 0,       0, 0, 0, 0
+        /* ----------------------------------- BUTTON ----------------------------------- */
+        {//    border_normal         base_normal         text_normal
+            BORDER_COLOR_NORMAL,  BASE_COLOR_NORMAL,  TEXT_COLOR_NORMAL,  // state: NORMAL  
+        //     border_focused        base_focused        text_focused
+            BORDER_COLOR_FOCUSED, BASE_COLOR_FOCUSED, TEXT_COLOR_FOCUSED, // state: FOCUSED
+        //     border_clicked        base_clicked        text_clicked
+            BORDER_COLOR_CLICKED, BASE_COLOR_CLICKED, TEXT_COLOR_CLICKED, // state: CLICKED
+        //      border_width        text_alignment
+               __BORDER_WIDTH,       ALIGN_CENTER,
+        //      left_padding         right_padding       top_padding       bottom_padding
+                     0,                   0,                  0,                 0,       
+        //      rect_margin           border_gap
+                     0,                   0,
         }, 
-        /* Button Grid */
-        { 
-            BORDER_COLOR_NORMAL, BASE_COLOR_NORMAL, TEXT_COLOR_NORMAL,     // state: NORMAL  
-            BORDER_COLOR_FOCUSED, BASE_COLOR_FOCUSED, TEXT_COLOR_FOCUSED,  // state: FOCUSED
-            BORDER_COLOR_CLICKED, BASE_COLOR_CLICKED, TEXT_COLOR_CLICKED,  // state: CLICKED
-            __BORDER_WIDTH, ALIGN_CENTER, 
-            0, 0, 0, 0,       0, 0, 0, 0
+        /* -------------------------------- BUTTON_GRID --------------------------------- */
+        {//    border_normal         base_normal         text_normal
+            BORDER_COLOR_NORMAL,  BASE_COLOR_NORMAL,  TEXT_COLOR_NORMAL,  // state: NORMAL  
+        //     border_focused        base_focused        text_focused
+            BORDER_COLOR_FOCUSED, BASE_COLOR_FOCUSED, TEXT_COLOR_FOCUSED, // state: FOCUSED
+        //     border_clicked        base_clicked        text_clicked
+            BORDER_COLOR_CLICKED, BASE_COLOR_CLICKED, TEXT_COLOR_CLICKED, // state: CLICKED
+        //      border_width        text_alignment
+               __BORDER_WIDTH,       ALIGN_CENTER,
+        //      left_padding         right_padding       top_padding       bottom_padding
+                     0,                   0,                  0,                 0,       
+        //      rect_margin           border_gap
+                     0,                   0,
         }, 
-        /* Titlebar */
-        { 
-            BORDER_COLOR_NORMAL, BASE_COLOR_NORMAL, TEXT_COLOR_NORMAL,     // state: NORMAL  
-            NO_COLOR_VALUE, NO_COLOR_VALUE, NO_COLOR_VALUE,                // state: FOCUSED
-            NO_COLOR_VALUE, NO_COLOR_VALUE, NO_COLOR_VALUE,                // state: CLICKED
-            __BORDER_WIDTH, ALIGN_LEFT, 
-            10, 0, 0, 0,      0, 0, 0, 0
+        /* --------------------------------- TITLEBAR ----------------------------------- */
+        {//    border_normal         base_normal         text_normal
+            BORDER_COLOR_NORMAL,  BASE_COLOR_NORMAL,  TEXT_COLOR_NORMAL, // state: NORMAL  
+        //     border_focused        base_focused        text_focused
+               NO_COLOR_VALUE,      NO_COLOR_VALUE,     NO_COLOR_VALUE,  // state: FOCUSED
+        //     border_clicked        base_clicked        text_clicked
+               NO_COLOR_VALUE,      NO_COLOR_VALUE,     NO_COLOR_VALUE,  // state: CLICKED
+        //      border_width        text_alignment
+               __BORDER_WIDTH,        ALIGN_LEFT,
+        //      left_padding         right_padding       top_padding       bottom_padding
+                    10,                   0,                  0,                 0,       
+        //      rect_margin           border_gap
+                     0,                   0,
+        }, 
+        /* ---------------------------------- TOGGLE ------------------------------------ */
+        {//    border_normal         base_normal         text_normal
+            BORDER_COLOR_NORMAL,  BASE_COLOR_NORMAL,  TEXT_COLOR_NORMAL,  // state: NORMAL  
+        //     border_focused        base_focused        text_focused
+            BORDER_COLOR_FOCUSED, BASE_COLOR_FOCUSED, TEXT_COLOR_FOCUSED, // state: FOCUSED
+        //     border_clicked        base_clicked        text_clicked
+            BORDER_COLOR_CLICKED, BASE_COLOR_CLICKED, TEXT_COLOR_CLICKED, // state: CLICKED
+        //      border_width        text_alignment
+               __BORDER_WIDTH,       ALIGN_CENTER,
+        //      left_padding         right_padding       top_padding       bottom_padding
+                     0,                   0,                  0,                 0,       
+        //      rect_margin           border_gap
+                     0,                   0,
+        }, 
+        /* ----------------------------------- LABEL ------------------------------------- */
+        {//    border_normal         base_normal         text_normal
+               NO_COLOR_VALUE,      NO_COLOR_VALUE,   TEXT_COLOR_NORMAL, // state: NORMAL  
+        //     border_focused        base_focused        text_focused
+               NO_COLOR_VALUE,      NO_COLOR_VALUE,     NO_COLOR_VALUE,  // state: FOCUSED
+        //     border_clicked        base_clicked        text_clicked
+               NO_COLOR_VALUE,      NO_COLOR_VALUE,     NO_COLOR_VALUE,  // state: CLICKED
+        //      border_width        text_alignment
+                     0,               ALIGN_LEFT,
+        //      left_padding         right_padding       top_padding       bottom_padding
+                    10,                   0,                  0,                 0,       
+        //      rect_margin           border_gap
+                     0,                   0,
         },
-        /* TOGGLE */
-        { 
-            BORDER_COLOR_NORMAL, BASE_COLOR_NORMAL, TEXT_COLOR_NORMAL,      // state: NORMAL
-            BORDER_COLOR_FOCUSED, BASE_COLOR_FOCUSED, TEXT_COLOR_FOCUSED,   // state: FOCUSED
-            BORDER_COLOR_CLICKED, BASE_COLOR_CLICKED, TEXT_COLOR_CLICKED,   // state: CLICKED
-            __BORDER_WIDTH, ALIGN_CENTER, 
-            0, 0, 0, 0,      0, 0, 0, 0
+        /* ---------------------------------- CELLBOX ------------------------------------ */
+        {//    border_normal         base_normal         text_normal
+               NO_COLOR_VALUE,    BASE_COLOR_NORMAL,  TEXT_COLOR_NORMAL, // state: NORMAL  
+        //     border_focused        base_focused        text_focused
+               NO_COLOR_VALUE,      NO_COLOR_VALUE,     NO_COLOR_VALUE,  // state: FOCUSED
+        //     border_clicked        base_clicked        text_clicked
+               NO_COLOR_VALUE,      NO_COLOR_VALUE,     NO_COLOR_VALUE,  // state: CLICKED
+        //      border_width        text_alignment
+                     0,                   0,
+        //      left_padding         right_padding       top_padding       bottom_padding
+                     0,                   0,                  0,                 0,       
+        //      rect_margin           border_gap
+                     0,                   0,
         },
-        /* LABEL */
-        { 
-            NO_COLOR_VALUE, NO_COLOR_VALUE, TEXT_COLOR_NORMAL,              // state: NORMAL
-            NO_COLOR_VALUE, NO_COLOR_VALUE, NO_COLOR_VALUE,                 // state: FOCUSED
-            NO_COLOR_VALUE, NO_COLOR_VALUE, NO_COLOR_VALUE,                 // state: CLICKED
-            0, ALIGN_LEFT, 
-            10, 0, 0, 0,      0, 0, 0, 0
+        /* ---------------------------------- WINDOWBOX ----------------------------------- */
+        {//    border_normal         base_normal         text_normal
+            BORDER_COLOR_NORMAL,  BASE_COLOR_NORMAL,  TEXT_COLOR_NORMAL, // state: NORMAL  
+        //     border_focused        base_focused        text_focused
+               NO_COLOR_VALUE,      NO_COLOR_VALUE,     NO_COLOR_VALUE,  // state: FOCUSED
+        //     border_clicked        base_clicked        text_clicked
+               NO_COLOR_VALUE,      NO_COLOR_VALUE,     NO_COLOR_VALUE,  // state: CLICKED
+        //      border_width        text_alignment
+                     0,                   0,
+        //      left_padding         right_padding       top_padding       bottom_padding
+                     0,                   0,                  0,                 0,       
+        //      rect_margin           border_gap
+                     0,             __BORDER_WIDTH,
         },
-        /* CellBox */
-        { 
-            NO_COLOR_VALUE, BASE_COLOR_NORMAL, NO_COLOR_VALUE,              // state: NORMAL
-            NO_COLOR_VALUE, NO_COLOR_VALUE, NO_COLOR_VALUE,                 // state: FOCUSED
-            NO_COLOR_VALUE, NO_COLOR_VALUE, NO_COLOR_VALUE,                 // state: CLICKED
-            0, 0, 
-            0, 0, 0, 0,      0, 0, 0, 0
-        },
-        /* CellBox */
-        { 
-            BORDER_COLOR_NORMAL, BASE_COLOR_NORMAL, NO_COLOR_VALUE,         // state: NORMAL
-            NO_COLOR_VALUE, NO_COLOR_VALUE, NO_COLOR_VALUE,                 // state: FOCUSED
-            NO_COLOR_VALUE, NO_COLOR_VALUE, NO_COLOR_VALUE,                 // state: CLICKED
-            0, 0, 
-            0, 0, 0, 0,      0, 0, 0, 0
-        },
-    }, 
-    .fonts = {RUIES_FONT, RUIES_FONT, RUIES_FONT, RUIES_FONT, RUIES_FONT, RUIES_FONT, RUIES_FONT},
-    #ifndef USE_CUSTOM_FONT
-    .font_sizes = {RUIES_FONT_SIZE, RUIES_FONT_SIZE, RUIES_FONT_SIZE, RUIES_FONT_SIZE, RUIES_FONT_SIZE, RUIES_FONT_SIZE, RUIES_FONT_SIZE},
-    #else 
-    .font_sizes = {       0,               0,               0,               0,               0,               0,               0       },
+        /* ----------------------------------- CHECKBOX ----------------------------------- */
+        {//    border_normal         base_normal         text_normal
+            BORDER_COLOR_NORMAL,  BASE_COLOR_NORMAL,  TEXT_COLOR_NORMAL, // state: NORMAL  
+        //     border_focused        base_focused        text_focused
+            BORDER_COLOR_NORMAL,  BASE_COLOR_NORMAL,  TEXT_COLOR_NORMAL, // state: FOCUSED
+        //     border_clicked        base_clicked        text_clicked
+            BORDER_COLOR_NORMAL,  BASE_COLOR_NORMAL,  TEXT_COLOR_NORMAL, // state: CLICKED
+        //      border_width        text_alignment
+               __BORDER_WIDTH,        ALIGN_LEFT,
+        //      left_padding         right_padding       top_padding       bottom_padding
+                     5,                   5,                  5,                 5,       
+        //      rect_margin           border_gap
+              __BORDER_WIDTH,             0,
+        }, 
+        /* --------------------------------- INDICATOR ----------------------------------- */
+        {//    border_normal         base_normal         text_normal
+            BORDER_COLOR_NORMAL,  BASE_COLOR_NORMAL,   TEXT_COLOR_NORMAL, // state: NORMAL/OFF  
+        //     border_focused        base_focused        text_focused
+            BORDER_COLOR_FOCUSED,  BASE_COLOR_FOCUSED, TEXT_COLOR_FOCUSED, // state: !!UNUSED!!
+        //     border_clicked        base_clicked        text_clicked
+            BORDER_COLOR_CLICKED,     0xE06C75FF,     TEXT_COLOR_CLICKED, // state: CLICKED/ON
+        //      border_width        text_alignment
+               __BORDER_WIDTH,        ALIGN_LEFT,
+        //      left_padding         right_padding       top_padding       bottom_padding
+                     5,                   5,                  5,                 5,       
+        //      rect_margin           border_gap
+                     0,                   0,
+        }, 
+    },
+    /*                  BUTTON         BUTTON_GRID       TITLEBAR          TOGGLE            LABEL           CELLBOX         WINDOWBOX       CHECKBOX        INDICATOR */
+    .fonts = {        EMPTY_FONT,      EMPTY_FONT,      EMPTY_FONT,      EMPTY_FONT,      EMPTY_FONT,      EMPTY_FONT,      EMPTY_FONT,     EMPTY_FONT,      EMPTY_FONT},
+    #ifndef RUIES_USE_CUSTOM_FONT
+    .font_sizes = {RUIES_FONT_SIZE, RUIES_FONT_SIZE, RUIES_FONT_SIZE, RUIES_FONT_SIZE, RUIES_FONT_SIZE, RUIES_FONT_SIZE, RUIES_FONT_SIZE, RUIES_FONT_SIZE, RUIES_FONT_SIZE},
+    #else
+    .font_sizes = {       0,               0,               0,               0,               0,               0,               0,               0,                0},
     #endif
 };
 
-/* NOTE: fontloader function should be generated using raylib's ExportFontAsCode() function
- *       and you should remove the check for IsGpuReady in the .h file for this function to 
- *       correctly load your desired font 
- */
-
-#ifndef USE_CUSTOM_FONT
+#ifndef RUIES_USE_CUSTOM_FONT
     void ruies_load_default_font(void) {
-        Font ruies_font = RUIES_FONT_FONT;
+        Font ruies_font = RUIES_FONT;
         for (int i = 0; i < MAX_ELEMENTS_COUNT; ++i) {
             __style.fonts[i] = ruies_font;
             __style.font_sizes[i] = RUIES_FONT_SIZE;
         }
+        __global_reserved_font = ruies_font;
+        __global_font_loaded = true;
+        __ruies_error = 0;
+    }
+    Font ruies_extract_default_font(void) {
+        __ruies_error = 0;
+        if (__global_font_loaded) return __global_reserved_font;
+        else return RUIES_FONT;
     }
 #else 
     void ruies_load_custom_font(Font font, float font_size) {
@@ -930,19 +1082,16 @@ static Ruies_GlobalStyle_t __style = {
             __style.fonts[i] = font;
             __style.font_sizes[i] = font_size;
         }
+        __global_reserved_font = font;
+        __global_font_loaded = true;
+        __ruies_error = 0;
     }
 #endif
 
 void set_elem_font(Ruies_ElementTypes_t type, Font font, float font_size) {
-    if (type == ALL_ELEMENTS) {
-        for (int i = 0; i < MAX_ELEMENTS_COUNT; ++i) {
-            __style.fonts[i] = font;
-            __style.font_sizes[i] = font_size;
-        }
-    } else {
-        __style.fonts[type] = font;
-        __style.font_sizes[type] = font_size;
-    }
+    __style.fonts[type] = font;
+    __style.font_sizes[type] = font_size;
+    __ruies_error = 0;
 }
 
 int check_ruies_error(void) {
@@ -954,11 +1103,12 @@ Ruies_Button_t make_button(Ruies_Rect_t bounds, const char* text) {
     Ruies_Button_t btn = {0};
     /* Assaign a unique id to a button */
     btn.id = (!__current_elem_idx ? 0 : __current_elem_idx+1);
+    __current_elem_idx += 1;
     btn.bounds = bounds;
 
     /* Check if user didn't provided any title to the function */
     if (text != NULL) {
-        btn.text = rlui_strdup(text);
+        btn.text = ruies_strdup(text);
     } else {
         __ruies_error = 1;
         return btn;
@@ -968,7 +1118,7 @@ Ruies_Button_t make_button(Ruies_Rect_t bounds, const char* text) {
     btn.font = __style.fonts[BUTTON];
     btn.font_size = __style.font_sizes[BUTTON];
     btn.state = NORMAL;
-    __current_elem_idx += 1;
+    btn.is_inscribed_in_cell = false;
     __ruies_error = 0;
     return btn;
 }
@@ -978,19 +1128,24 @@ Ruies_TitleBar_t make_titlebar(Ruies_Rect_t bounds, const char* text) {
     Ruies_TitleBar_t titlebar = {0};
     /* Assaign an unique id to every created titlebar */
     titlebar.id = (!__current_elem_idx ? 0 : __current_elem_idx+1);
+    __current_elem_idx += 1;
     titlebar.bounds = bounds;
     /* Check if no title was provided */
     if (text != NULL) {
-        titlebar.text = rlui_strdup(text);
+        titlebar.text = ruies_strdup(text);
     } else {
         __ruies_error = 1;
         return titlebar;
     }
 
+    titlebar.border_widths.top_border_width = 0;
+    titlebar.border_widths.bottom_border_width = 0;
+    titlebar.border_widths.left_border_width = 0;
+    titlebar.border_widths.right_border_width = 0;
+
     memcpy(&titlebar.style, &__style.elem_styles[TITLEBAR], sizeof(uint32_t)*MAX_ELEMENT_ATTRIBUTES);
     titlebar.font = __style.fonts[TITLEBAR];
     titlebar.font_size = __style.font_sizes[TITLEBAR];
-    __current_elem_idx += 1;
     __ruies_error = 0;
     return titlebar;
 }
@@ -1039,7 +1194,7 @@ Ruies_ButtonGrid_t make_button_grid(uint32_t posx, uint32_t posy, uint32_t rows,
     }
     /* Assaign text to every button */
     for (uint32_t x = 0; x < num_of_buttons; ++x) {
-        button_grid.buttons[x].text = rlui_strdup(text[x]);
+        button_grid.buttons[x].text = ruies_strdup(text[x]);
     }
     /* Set other properties of a button array */
     button_grid.origin_posx = posx;
@@ -1055,10 +1210,11 @@ Ruies_ButtonGrid_t make_button_grid(uint32_t posx, uint32_t posy, uint32_t rows,
 Ruies_Toggle_t make_toggle(Ruies_Rect_t bounds, const char* text) {
     Ruies_Toggle_t toggle = {0};
     toggle.id = (!__current_elem_idx ? 0 : __current_elem_idx+1);
+    __current_elem_idx += 1;
     toggle.bounds = bounds;
 
     if (text != NULL) {
-        toggle.text = rlui_strdup(text);
+        toggle.text = ruies_strdup(text);
     } else {
         __ruies_error = 1;
         return toggle;
@@ -1068,7 +1224,7 @@ Ruies_Toggle_t make_toggle(Ruies_Rect_t bounds, const char* text) {
     toggle.font = __style.fonts[TOGGLE];
     toggle.font_size = __style.font_sizes[TOGGLE];
     toggle.state = NORMAL;
-    __current_elem_idx += 1;
+    toggle.is_inscribed_in_cell = false;
     __ruies_error = 0;
     return toggle;
 }
@@ -1076,10 +1232,11 @@ Ruies_Toggle_t make_toggle(Ruies_Rect_t bounds, const char* text) {
 Ruies_Label_t make_label(Ruies_Rect_t bounds, const char* text, uint32_t left_padding, uint32_t right_padding) {
     Ruies_Label_t label = {0};
     label.id = (!__current_elem_idx ? 0 : __current_elem_idx+1);
+    __current_elem_idx += 1;
     label.bounds = bounds;
 
     if (text != NULL) {
-        label.text = rlui_strdup(text);
+        label.text = ruies_strdup(text);
     } else {
         __ruies_error = 1;
         return label;
@@ -1090,7 +1247,7 @@ Ruies_Label_t make_label(Ruies_Rect_t bounds, const char* text, uint32_t left_pa
     label.style[ATTR_RIGHT_PADDING] = right_padding;
     label.font = __style.fonts[LABEL];
     label.font_size = __style.font_sizes[LABEL];
-    __current_elem_idx += 1;
+    label.is_inscribed_in_cell = false;
     __ruies_error = 0;
     return label;
 }
@@ -1105,36 +1262,33 @@ Ruies_CellBox_t make_cellbox(Ruies_Rect_t bounds, uint32_t rows, uint32_t cols, 
     __current_elem_idx += 1;
     cellbox.bounds = bounds;
 
-    uint32_t size = rows*cols;
-    cellbox.cell_bounds = malloc(size * sizeof(Ruies_Rect_t));
-    cellbox.cell_ids = malloc(size * sizeof(int));
+    int32_t size = rows*cols;
+    Ruies_CellBoxCell_t* cells = calloc(size, sizeof(Ruies_CellBoxCell_t)); 
+    cellbox.cells = cells;
     cellbox.cell_margin = cell_margin;
     cellbox.cell_cols = cols;
     cellbox.cell_rows = rows;
+    cellbox.num_of_cells = size;
 
+    calculate_cells(&cellbox.cells, cellbox.bounds, cellbox.cell_cols, cellbox.cell_rows, cellbox.cell_margin);
     for (uint32_t i = 0; i < size; ++i) {
-        cellbox.cell_ids[i] = i;
+        cellbox.cells[i].id = i;
     }
-    calculate_cells(&cellbox);
 
     cellbox.number_of_inscribed_elems = 0;
     __ruies_error = 0;
     return cellbox;
 }
 
-Ruies_WindowBox_t make_window_box(Ruies_Rect_t bounds, Ruies_WindowBoxStyles_t border_style, uint32_t border_width, uint32_t border_gap) {
+Ruies_WindowBox_t make_winbox(Ruies_Rect_t bounds, Ruies_WindowBoxStyles_t border_style) {
     Ruies_WindowBox_t winbox = {0};
     winbox.id = (!__current_elem_idx ? 0 : __current_elem_idx+1);
     __current_elem_idx += 1;
     winbox.bounds = bounds;
 
-    winbox.border_width = border_width;
-    set_global_style(WINBOX, ATTR_BORDER_WIDTH, border_width);
-    winbox.border_color = HEX2RUIESCOLOR(get_style_value(WINBOX, ATTR_BORDER_COLOR_NORMAL));
-    winbox.base_color = HEX2RUIESCOLOR(get_style_value(WINBOX, ATTR_BASE_COLOR_NORMAL));
-    winbox.border_gap = 0;
-    if (border_style == DOUBLE_BORDER) {
-        winbox.border_gap = border_gap;
+    memcpy(&winbox.style, &__style.elem_styles[WINBOX], MAX_ELEMENT_ATTRIBUTES * sizeof(uint32_t));
+    if (border_style != DOUBLE_BORDER) {
+        winbox.style[ATTR_BORDER_GAP] = 0;
     }
     winbox.state = NORMAL;
     winbox.border_style = border_style;
@@ -1142,87 +1296,137 @@ Ruies_WindowBox_t make_window_box(Ruies_Rect_t bounds, Ruies_WindowBoxStyles_t b
     return winbox;
 }
 
-void merge_neighbouring_cells(Ruies_CellBox_t* cellbox, Ruies_CellBoxSides_t side, int idx1);
-void split_cell_horizontaly(Ruies_CellBox_t* cellbox, int idx);
-void split_cell_verticaly(Ruies_CellBox_t* cellbox, int idx);
+Ruies_CheckBox_t make_checkbox(Ruies_Vec2_t pos, float square_size, const char* text, Ruies_TextPlacement_t text_atached_to) {
+    Ruies_CheckBox_t checkbox = {0};
+    checkbox.id = (!__current_elem_idx ? 0 : __current_elem_idx+1);
+    __current_elem_idx += 1;
+    checkbox.bounds = (Ruies_Rect_t){
+        .x = pos.x,
+        .y = pos.y,
+        .width = square_size,
+        .height = square_size,
+    };
 
-void inscribe_elem_into_cell(const void* elem, Ruies_ElementTypes_t type, Ruies_CellBox_t* cellbox, int cell_idx) {
-    Ruies_Rect_t elem_bounds;
-    bool found = false;
-    for (uint32_t i = 0; i < cellbox->cell_cols*cellbox->cell_rows; ++i) {
-        if (cellbox->cell_ids[i] == cell_idx) {
-            elem_bounds = cellbox->cell_bounds[cell_idx];
-            found = true;
-            break;
-        }
+    if (text != NULL) {
+        checkbox.text = ruies_strdup(text);
+    } else {
+        __ruies_error = 1;
+        return checkbox;
     }
-    if (!found) __ruies_error = 1;
-    else {
-        switch (type) {
-            case BUTTON:
-                ((Ruies_Button_t*)elem)->bounds = elem_bounds;
-                break;
-            case TOGGLE:
-                ((Ruies_Toggle_t*)elem)->bounds = elem_bounds;
-                break;
-            case TITLEBAR:
-                ((Ruies_TitleBar_t*)elem)->bounds = elem_bounds;
-                break;
-            case LABEL:
-                ((Ruies_Label_t*)elem)->bounds = elem_bounds;
-                break;
-            default:
-                __ruies_error = 1;
-                break;
-        }
-        cellbox->number_of_inscribed_elems++;
-        __ruies_error = 0;
+    memcpy(&checkbox.style, &__style.elem_styles[CHECKBOX], MAX_ELEMENT_ATTRIBUTES * sizeof(uint32_t));
+    checkbox.font = __style.fonts[CHECKBOX];
+    checkbox.font_size = __style.font_sizes[CHECKBOX];
+    checkbox.is_inscribed_in_cell = false;
+    checkbox.text_pos = text_atached_to;
+    checkbox.state = NORMAL;
+    __ruies_error = 0;
+    return checkbox;
+}
+
+Ruies_Indicator_t make_indicator(Ruies_Vec2_t center_pos, float radius, const char* text, Ruies_TextPlacement_t text_pos, Ruies_IndicatorState_t init_state) {
+    Ruies_Indicator_t indicator = {0};
+    indicator.id = (!__current_elem_idx ? 0 : __current_elem_idx+1);
+    __current_elem_idx += 1;
+    indicator.pos = center_pos;
+    indicator.radius = radius;
+
+    if (text != NULL) {
+        indicator.text = ruies_strdup(text);
+    } else {
+        __ruies_error = 1;
+        return indicator;
     }
+
+    memcpy(&indicator.style, &__style.elem_styles[INDICATOR], MAX_ELEMENT_ATTRIBUTES * sizeof(uint32_t));
+    indicator.font = __style.fonts[INDICATOR];
+    indicator.font_size = __style.font_sizes[INDICATOR];
+    indicator.text_placement = text_pos;
+    indicator.state = init_state;
+
+    __ruies_error = 0;
+    return indicator;
+}
+
+void set_indicator_on(Ruies_Indicator_t* indicator) {
+    if (indicator->state != INDICATOR_ON) indicator->state = INDICATOR_ON;
+}
+
+void set_indicator_off(Ruies_Indicator_t* indicator) {
+    if (indicator->state != INDICATOR_OFF) indicator->state = INDICATOR_OFF;
+}
+
+void set_indicator_onoff(Ruies_Indicator_t* indicator) {
+    if (indicator->state == INDICATOR_ON) indicator->state = INDICATOR_OFF;
+    else if (indicator->state == INDICATOR_OFF) indicator->state = INDICATOR_ON;
+    else if (indicator->state == INDICATOR_BLINKING) indicator->state = INDICATOR_OFF;
+}
+
+void set_indicator_blink(Ruies_Indicator_t* indicator, float blink_interval) {
+    indicator->state = INDICATOR_BLINKING;
+    indicator->blink_interval = blink_interval;
+}
+
+int cell_pos_cellbox(Ruies_CellBox_t cellbox, int id) {
+    for (int i = 0; i < cellbox.num_of_cells; ++i) {
+        if (cellbox.cells[i].id == id) return i;
+    }
+    return -1;
+}
+
+void inscribe_button_into_cell(Ruies_Button_t* button, Ruies_CellBox_t* cellbox, int cell_idx) {
+    int cell_pos = cell_pos_cellbox(*cellbox, cell_idx);
+    if (cell_pos < 0) RUIES_ERROR_OUT(); 
+    if (cellbox->cells[cell_pos].is_inscribed_elem || button->is_inscribed_in_cell) RUIES_ERROR_OUT(); 
+
+    button->bounds = cellbox->cells[cell_pos].bounds;
+    button->is_inscribed_in_cell = true;
+    ++cellbox->number_of_inscribed_elems;
+    cellbox->cells[cell_pos].is_inscribed_elem = true;
+    __ruies_error = 0;
+}
+
+void inscribe_toggle_into_cell(Ruies_Toggle_t* toggle, Ruies_CellBox_t* cellbox, int cell_idx) {
+    int cell_pos = cell_pos_cellbox(*cellbox, cell_idx);
+    if (cell_pos < 0) RUIES_ERROR_OUT();
+    if (cellbox->cells[cell_pos].is_inscribed_elem || toggle->is_inscribed_in_cell) RUIES_ERROR_OUT();
+
+    toggle->bounds = cellbox->cells[cell_pos].bounds;
+    toggle->is_inscribed_in_cell = true;
+    ++cellbox->number_of_inscribed_elems;
+    cellbox->cells[cell_pos].is_inscribed_elem = true;
+    __ruies_error = 0;
 }
 
 void insert_cellbox_into_window_box(Ruies_CellBox_t* cellbox, Ruies_WindowBox_t winbox) {
-    Ruies_Rect_t bounds;
-    if (winbox.border_style == NORMAL_BORDER) {
-        bounds = (Ruies_Rect_t){
-            .x = winbox.bounds.x+winbox.border_width,
-            .y = winbox.bounds.y+winbox.border_width,
-            .width = winbox.bounds.width-(2.0f*winbox.border_width),
-            .height = winbox.bounds.height-(2.0f*winbox.border_width),
-        };
-    } else {
-        bounds = (Ruies_Rect_t){
-            .x = winbox.bounds.x+winbox.border_gap+(2.0f*winbox.border_width),
-            .y = winbox.bounds.y+winbox.border_gap+(2.0f*winbox.border_width),
-            .width = winbox.bounds.width-((4.0f*winbox.border_width)+(2.0f*winbox.border_gap)),
-            .height = winbox.bounds.height-((4.0f*winbox.border_width)+(2.0f*winbox.border_gap)),
-        };
-    }
+    Ruies_Rect_t bounds = {0};
+    if (winbox.border_style == NORMAL_BORDER) bounds = RECTWITHBORDER(winbox.bounds, winbox.style[ATTR_BORDER_WIDTH]);
+    else bounds = RECTWITHBORDER(winbox.bounds, winbox.style[ATTR_BORDER_GAP]+(2.0f*winbox.style[ATTR_BORDER_WIDTH]));
     cellbox->bounds = bounds;
-    calculate_cells(cellbox);
+    calculate_cells(&cellbox->cells, bounds, cellbox->cell_cols, cellbox->cell_rows, cellbox->cell_margin);
     __ruies_error = 0;
 }
 
 void set_cellbox_cell_margin(Ruies_CellBox_t* cellbox, uint32_t cell_margin) {
     cellbox->cell_margin = cell_margin;
-    calculate_cells(cellbox);
+    calculate_cells(&cellbox->cells, cellbox->bounds, cellbox->cell_cols, cellbox->cell_rows, cell_margin);
     __ruies_error = 0;
 }
 
-void calculate_cells(Ruies_CellBox_t* cellbox) {
-    float horizontal_step = cellbox->cell_margin;
-    float vertical_step = cellbox->cell_margin;
-    float horiz_div = ((cellbox->bounds.width-((cellbox->cell_cols+1)*cellbox->cell_margin))/(float)cellbox->cell_cols);
-    float verti_div = ((cellbox->bounds.height-((cellbox->cell_rows+1)*cellbox->cell_margin))/(float)cellbox->cell_rows);
+void calculate_cells(Ruies_CellBoxCell_t** cells, Ruies_Rect_t cellbox_bounds, uint32_t cols, uint32_t rows, float cell_margin) {
+    float horizontal_step = cell_margin;
+    float vertical_step = cell_margin;
+    float horiz_div = ((cellbox_bounds.width-((cols+1)*cell_margin))/(float)cols);
+    float verti_div = ((cellbox_bounds.height-((rows+1)*cell_margin))/(float)rows);
 
-    for (uint32_t i = 0; i < cellbox->cell_rows*cellbox->cell_cols; ++i) {
-        cellbox->cell_bounds[i].x = cellbox->bounds.x+horizontal_step;
-        cellbox->cell_bounds[i].y = cellbox->bounds.y+vertical_step;
-        cellbox->cell_bounds[i].width = horiz_div;
-        cellbox->cell_bounds[i].height = verti_div;
-        horizontal_step += (horiz_div+cellbox->cell_margin);
-        if ((i+1) % cellbox->cell_cols == 0) {
-            vertical_step += (verti_div+cellbox->cell_margin);
-            horizontal_step = cellbox->cell_margin;
+    for (uint32_t i = 0; i < cols*rows; ++i) {
+        (*cells)[i].bounds.x = cellbox_bounds.x+horizontal_step;
+        (*cells)[i].bounds.y = cellbox_bounds.y+vertical_step;
+        (*cells)[i].bounds.width = horiz_div;
+        (*cells)[i].bounds.height = verti_div;
+        horizontal_step += (horiz_div+cell_margin);
+        if ((i+1) % cols == 0) {
+            vertical_step += (verti_div+cell_margin);
+            horizontal_step = cell_margin;
         }
     }
     __ruies_error = 0;
@@ -1232,27 +1436,34 @@ int relative_cellbox_id(int cols, int x, int y) {
     return (y*cols)+x;
 }
 
-Ruies_Button_t make_button_from_button(Ruies_Button_t button, Ruies_Rect_t bounds, const char* text) {
-    Ruies_Button_t new_button;
-    memcpy(&new_button, &button, sizeof(Ruies_Button_t));
-    new_button.bounds = bounds;
-    new_button.text = rlui_strdup(text);
-    new_button.id = button.id + 1;
-    __current_elem_idx += 1;
+void visualize_cells(Ruies_CellBox_t cellbox) {
+    for (int i = 0; i < cellbox.num_of_cells; ++i) {
+        Ruies_Rect_t bounds = cellbox.cells[i].bounds;
+
+        /* Display each of cells id */
+        char buff[32];
+        snprintf(buff, sizeof(buff), "%d", cellbox.cells[i].id);
+        Vector2 text_pos = RAYLIB_VEC2(__get_elem_text_pos(bounds, __style.fonts[CELLBOX], buff));
+
+        Vector2 start_pos_top_left = RAYLIB_VEC2(TOPLEFTRECTPOINT(bounds));
+        Vector2 start_pos_bottom_right = RAYLIB_VEC2(BOTTOMRIGHTRECTPOINT(bounds));
+
+        Vector2 end_pos1 = RAYLIB_VEC2(BOTTOMLEFTRECTPOINT(bounds));
+        Vector2 end_pos2 = RAYLIB_VEC2(TOPRIGHTRECTPOINT(bounds));
+        Vector2 end_pos3 = RAYLIB_VEC2(BOTTOMLEFTRECTPOINT(bounds));
+        Vector2 end_pos4 = RAYLIB_VEC2(TOPRIGHTRECTPOINT(bounds));
+
+        Color color = RAYLIB_COLOR(ruies_hex2color(__style.elem_styles[CELLBOX][ATTR_TEXT_COLOR_NORMAL]));
+
+        DrawLineEx(start_pos_top_left, end_pos1, 1, color);
+        DrawLineEx(start_pos_top_left, end_pos2, 1, color);
+        DrawLineEx(start_pos_bottom_right, end_pos3, 1, color);
+        DrawLineEx(start_pos_bottom_right, end_pos3, 1, color);
+        DrawTextEx(__style.fonts[CELLBOX], buff, text_pos, __style.font_sizes[CELLBOX], 0, color);
+    }
     __ruies_error = 0;
-    return new_button;
 }
 
-Ruies_Toggle_t make_toggle_from_toggle(Ruies_Toggle_t toggle, Ruies_Rect_t bounds, const char* text) {
-    Ruies_Toggle_t new_toggle;
-    memcpy(&new_toggle, &toggle, sizeof(Ruies_Button_t));
-    new_toggle.bounds = bounds;
-    new_toggle.text = rlui_strdup(text);
-    new_toggle.id = toggle.id + 1;
-    __current_elem_idx += 1;
-    __ruies_error = 0;
-    return new_toggle;
-}
 /* Label releated functions */
 void attach_label_to_elem(const void* elem, Ruies_ElementTypes_t type, Ruies_Label_t* label, Ruies_ElemAttachment_t attach_to) {
     Ruies_Rect_t elem_bounds = {0};
@@ -1270,124 +1481,107 @@ void attach_label_to_elem(const void* elem, Ruies_ElementTypes_t type, Ruies_Lab
             elem_bounds = (*(Ruies_Label_t*)elem).bounds;
             break;
         default:
-            __ruies_error = 1;
+            RUIES_ERROR_OUT();
             break;
     }
     switch (attach_to) {
-        case TO_THE_LEFT:
+        case ATTACH_LEFT:
             label->bounds.x = elem_bounds.x-label->bounds.width;
             label->bounds.y = elem_bounds.y;
             break;
-        case ON_TOP:
+        case ATTACH_TOP:
             label->bounds.x = elem_bounds.x;
             label->bounds.y = elem_bounds.y-label->bounds.height;
             break;
-        case TO_THE_RIGHT:
+        case ATTACH_RIGHT:
             label->bounds.x = elem_bounds.x+elem_bounds.width;
             label->bounds.y = elem_bounds.y;
             break;
-        case TO_BOTTOM:
+        case ATTACH_BOTTOM:
             label->bounds.x = elem_bounds.x;
             label->bounds.y = elem_bounds.y+elem_bounds.height;
             break;
         default:
-            __ruies_error = 1;
+            RUIES_ERROR_OUT();
             break;
     }
     label->is_attached = true;
 }
 
-void set_global_style(Ruies_ElementTypes_t elem_type, Ruies_ElemAttr_t attr, uint32_t value) {
-    if (elem_type == ALL_ELEMENTS) {
-        for (int i = 0; i < MAX_ELEMENTS_COUNT; ++i) {
-            if (UNDEFINED_COLOR(__style.elem_styles[i][attr])) {
-                __ruies_error = 1;
-                break;
-            }
-            __style.elem_styles[i][attr] = value;
-            __ruies_error = 0;
-        }
-    } else {
-        if (UNDEFINED_COLOR(__style.elem_styles[elem_type][attr])) {
-            __ruies_error = 1;
-        } else {
-            __style.elem_styles[elem_type][attr] = value;
-            __ruies_error = 0;
-        }
+void set_elem_style_attr(Ruies_ElementTypes_t elem_type, Ruies_ElemAttr_t attr, uint32_t value) {
+    __style.elem_styles[elem_type][attr] = value;
+    __ruies_error = 0;
+}
+
+void set_global_style_attr(Ruies_ElemAttr_t attr, uint32_t value) {
+    for (int i = 0; i < MAX_ELEMENTS_COUNT; ++i) {
+        __style.elem_styles[i][attr] = value;
+        __ruies_error = 0;
     }
 }
 
 uint32_t* get_style(Ruies_ElementTypes_t elem, int* size) {
-    if (elem == ALL_ELEMENTS) {
-        if (size != NULL) *size = 0;
-        __ruies_error = 1;
-        return NULL;
-    }
-    *size = sizeof(__style.elem_styles[elem])/sizeof(__style.elem_styles[elem][0]);
+    if (size != NULL) *size = sizeof(__style.elem_styles[elem])/sizeof(__style.elem_styles[elem][0]);
     __ruies_error = 0;
     return __style.elem_styles[elem];
 }
 
 uint32_t get_style_value(Ruies_ElementTypes_t elem, Ruies_ElemAttr_t attr) {
-    if (elem == ALL_ELEMENTS) {
-        __ruies_error = 1;
-        return 0;
-    }
+    __ruies_error = 0;
     return __style.elem_styles[elem][attr];
 }
 
 void get_style_colors(Ruies_ElemState_t state, uint32_t* style, Ruies_Color_t* border, Ruies_Color_t* base, Ruies_Color_t* text) {
-    if (border != NULL) *border = HEX2RUIESCOLOR(style[state*3]);
-    if (base != NULL) *base = HEX2RUIESCOLOR(style[(state*3)+1]);
-    if (text != NULL) *text = HEX2RUIESCOLOR(style[(state*3)+2]);
+    if (border != NULL) *border = ruies_hex2color(style[state*3]);
+    if (base != NULL) *base = ruies_hex2color(style[(state*3)+1]);
+    if (text != NULL) *text = ruies_hex2color(style[(state*3)+2]);
     __ruies_error = 0;
 }
 
 /* Function to change attributes of button */
-void set_button_style(Ruies_Button_t* button, Ruies_ElemAttr_t attr, uint32_t value) {
-    if (UNDEFINED_COLOR(button->style[attr])) {
-        __ruies_error = 1;
-    } else {
-        button->style[attr] = value;
-        __ruies_error = 0;
-    }
+void set_button_style_attr(Ruies_Button_t* button, Ruies_ElemAttr_t attr, uint32_t value) {
+    button->style[attr] = value;
+    __ruies_error = 0;
 }
 
 /* Function to change attributes of the titlebar */
-void set_titlebar_style(Ruies_TitleBar_t* titlebar, Ruies_ElemAttr_t attr, uint32_t value) {
-    if (UNDEFINED_COLOR(titlebar->style[attr])) {
-        __ruies_error = 1;
-    } else {
-        titlebar->style[attr] = value;
-        __ruies_error = 0;
-    }
+void set_titlebar_style_attr(Ruies_TitleBar_t* titlebar, Ruies_ElemAttr_t attr, uint32_t value) {
+    titlebar->style[attr] = value;
+    __ruies_error = 0;
 }
 
 /* Function to change the attribute of every button in a button grid */
-void button_grid_attr(Ruies_ButtonGrid_t* button_grid, Ruies_ElemAttr_t attr, uint32_t value) {
-    for (int i = 0; i < (button_grid->rows*button_grid->cols); ++i) {
-        set_button_style(&button_grid->buttons[i], attr, value);
+void set_button_grid_style_attr(Ruies_ButtonGrid_t* grid, Ruies_ElemAttr_t attr, uint32_t value) {
+    for (int i = 0; i < (grid->rows*grid->cols); ++i) {
+        set_button_style_attr(&grid->buttons[i], attr, value);
         if (check_ruies_error()) break;
         else __ruies_error = 0;
     }
 }
 
-void set_toggle_style(Ruies_Toggle_t* toggle, Ruies_ElemAttr_t attr, uint32_t value) {
-    if (UNDEFINED_COLOR(toggle->style[attr])) {
-        __ruies_error = 1;
-    } else {
-        toggle->style[attr] = value;
-        __ruies_error = 0;
-    }
+void set_toggle_style_attr(Ruies_Toggle_t* toggle, Ruies_ElemAttr_t attr, uint32_t value) {
+    toggle->style[attr] = value;
+    __ruies_error = 0;
 }
 
-void set_label_style(Ruies_Label_t* label, Ruies_ElemAttr_t attr, uint32_t value) {
-    if (UNDEFINED_COLOR(label->style[attr])) {
-        __ruies_error = 1;
-    } else {
-        label->style[attr] = value;
-        __ruies_error = 0;
-    }
+void set_label_style_attr(Ruies_Label_t* label, Ruies_ElemAttr_t attr, uint32_t value) {
+    label->style[attr] = value;
+    __ruies_error = 0;
+}
+
+void set_winbox_style_attr(Ruies_WindowBox_t* winbox, Ruies_ElemAttr_t attr, uint32_t value) {
+    winbox->style[attr] = value;
+    __ruies_error = 0;
+}
+
+void set_checkbox_style_attr(Ruies_CheckBox_t* checkbox, Ruies_ElemAttr_t attr, uint32_t value) {
+    checkbox->style[attr] = value;
+    __ruies_error = 0;
+}
+
+void set_indicator_style_attr(Ruies_Indicator_t* indic, Ruies_ElemAttr_t attr, uint32_t value) {
+    indic->style[attr] = value;
+    __ruies_error = 0;
 }
 
 /* Function to adjuct positions and dimensions of every button in button array so that they will stretch horizotaly to the until_x value 
@@ -1434,41 +1628,53 @@ void stretch_button_grid_verti(Ruies_ButtonGrid_t* button_grid, uint32_t vertica
 }
 
 /* Function for rendering a button */
-void render_button(Ruies_Button_t* button) {
-    __detect_button_state_change(button);
-    Ruies_Color_t border_color, base_color, text_color;
-    Ruies_Vec2_t border_bounds[2] = {
-        /* Position */
-        __get_elem_with_border_pos(button->bounds, button->style[ATTR_BORDER_WIDTH]),
-        /* Dimension */
-        __get_elem_with_border_dims(button->bounds, button->style[ATTR_BORDER_WIDTH]),
-    };
-    Ruies_Vec2_t text_pos = __get_elem_text_pos(button->bounds, button->font, button->text);
-    get_style_colors(button->state, button->style, &border_color, &base_color, &text_color);
-    /* Drawing */
-    DrawRectangleRec(RAYLIB_RECT(button->bounds), RAYLIB_COLOR(border_color));
-    DrawRectangleV(RAYLIB_VEC2(border_bounds[0]), RAYLIB_VEC2(border_bounds[1]), RAYLIB_COLOR(base_color));
-    DrawTextEx(button->font, button->text, RAYLIB_VEC2(text_pos), button->font_size, 0, RAYLIB_COLOR(text_color));
-    __ruies_error = 0;
-}
+bool render_button(Ruies_Button_t* button, Ruies_ElemState_t* state) {
+    bool hover = CheckCollisionPointRec(GetMousePosition(), RAYLIB_RECT(button->bounds));
+    bool pressed = false;
+    if (hover) {
+        if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) button->state = CLICKED;
+        else button->state = FOCUSED;
+        if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) pressed = true;
+    } else button->state = NORMAL;
 
-/* Function to render a variadic number of buttons */
-void vrender_button(int count, ...) {
-    va_list ap;
-    va_start(ap, count);
-    for (int i = 0; i < count; ++i) {
-        render_button(va_arg(ap, Ruies_Button_t*));
-    }
-    va_end(ap);
+    Ruies_Color_t border_color, base_color, text_color;
+    get_style_colors(button->state, button->style, &border_color, &base_color, &text_color);
+
+    Ruies_Vec2_t text_pos = __get_elem_text_pos(button->bounds, button->font, button->text);
+    /* Drawing */
+    ruies_draw_rect_with_border(button->bounds, button->style[ATTR_BORDER_WIDTH], border_color, base_color);
+    DrawTextEx(button->font, button->text, RAYLIB_VEC2(text_pos), button->font_size, 0, RAYLIB_COLOR(text_color));
+
     __ruies_error = 0;
+    if (state != NULL) *state = button->state;
+    return pressed;
 }
 
 /* Function to render a button array */
-void render_button_grid(Ruies_ButtonGrid_t* buttons) {
-    for (int i = 0; i < (buttons->cols*buttons->rows); ++i) {
-        render_button(&buttons->buttons[i]);
+bool render_button_grid(Ruies_ButtonGrid_t* button_grid, int button_id, int* ret_id, Ruies_ElemState_t* state) {
+    bool button_clicked = false;
+    bool passsed_id = false;
+    for (int i = 0; i < button_grid->cols*button_grid->rows; ++i) {
+        if (button_grid->buttons[i].id == button_id) {
+            passsed_id = true;
+            break;
+        }
+    }
+    Ruies_ElemState_t tmp_state;
+    for (int x = 0; x < button_grid->cols*button_grid->rows; ++x) {
+        if (x == button_id && passsed_id) button_clicked = render_button(&button_grid->buttons[x], state);
+        else if (passsed_id && x != button_id) render_button(&button_grid->buttons[x], NULL);
+        else if (!passsed_id) {
+            render_button(&button_grid->buttons[x], &tmp_state);
+            if (tmp_state == CLICKED) {
+                button_clicked = true;
+                *ret_id = button_grid->buttons[x].id;
+                if (state != NULL) *state = tmp_state;
+            }
+        }
     }
     __ruies_error = 0;
+    return button_clicked;
 }
 
 /* Function to render a titlebar */
@@ -1476,95 +1682,147 @@ void render_titlebar(Ruies_TitleBar_t titlebar) {
     Ruies_Vec2_t text_pos = __get_text_pos_align(titlebar.bounds, titlebar.style[ATTR_LEFT_PADDING], titlebar.style[ATTR_RIGHT_PADDING], 
                                             (Ruies_TextAlignment_t)titlebar.style[ATTR_TEXT_ALIGNMENT], titlebar.font, titlebar.font_size, 
                                             titlebar.text);
-    int64_t left_border_width = titlebar.style[ATTR_TITLEBAR_LEFT_BORDER_WIDTH];
-    int64_t right_border_width = titlebar.style[ATTR_TITLEBAR_RIGHT_BORDER_WIDTH];
-    int64_t top_border_width = titlebar.style[ATTR_TITLEBAR_TOP_BORDER_WIDTH];
-    int64_t bottom_border_width = titlebar.style[ATTR_TITLEBAR_BOTTOM_BORDER_WIDTH];
+    Ruies_Color_t border_color_normal = ruies_hex2color(titlebar.style[ATTR_BORDER_COLOR_NORMAL]);
 
-    Ruies_Color_t border_color_normal = HEX2RUIESCOLOR(titlebar.style[ATTR_BORDER_COLOR_NORMAL]);
-
-    DrawRectangleRec(RAYLIB_RECT(titlebar.bounds), RAYLIB_COLOR(HEX2RUIESCOLOR(titlebar.style[ATTR_BASE_COLOR_NORMAL])));
-    if (left_border_width > 0) {
-        DrawRectangle(titlebar.bounds.x, titlebar.bounds.y, left_border_width, 
+    DrawRectangleRec(RAYLIB_RECT(titlebar.bounds), RAYLIB_COLOR(ruies_hex2color(titlebar.style[ATTR_BASE_COLOR_NORMAL])));
+    if (titlebar.border_widths.left_border_width > 0) {
+        DrawRectangle(titlebar.bounds.x, titlebar.bounds.y, titlebar.border_widths.left_border_width, 
                       titlebar.bounds.height, RAYLIB_COLOR(border_color_normal));
     }
-    if (right_border_width > 0) {
-        DrawRectangle(titlebar.bounds.x+(titlebar.bounds.width-right_border_width), titlebar.bounds.y, left_border_width, 
+    if (titlebar.border_widths.right_border_width > 0) {
+        DrawRectangle(titlebar.bounds.x+(titlebar.bounds.width-titlebar.border_widths.right_border_width), titlebar.bounds.y, titlebar.border_widths.left_border_width, 
                       titlebar.bounds.height, RAYLIB_COLOR(border_color_normal));
     }
-    if (top_border_width > 0) {
+    if (titlebar.border_widths.top_border_width > 0) {
         DrawRectangle(titlebar.bounds.x, titlebar.bounds.y, titlebar.bounds.width, 
-                      top_border_width, RAYLIB_COLOR(border_color_normal));
+                      titlebar.border_widths.top_border_width, RAYLIB_COLOR(border_color_normal));
     }
-    if (bottom_border_width > 0) {
-        DrawRectangle(titlebar.bounds.x, titlebar.bounds.y+(titlebar.bounds.height-bottom_border_width), titlebar.bounds.width, 
-                      bottom_border_width, RAYLIB_COLOR(border_color_normal));
+    if (titlebar.border_widths.bottom_border_width > 0) {
+        DrawRectangle(titlebar.bounds.x, titlebar.bounds.y+(titlebar.bounds.height-titlebar.border_widths.bottom_border_width), titlebar.bounds.width, 
+                      titlebar.border_widths.bottom_border_width, RAYLIB_COLOR(border_color_normal));
     }
-    DrawTextEx(titlebar.font, titlebar.text, RAYLIB_VEC2(text_pos), titlebar.font_size, 0, RAYLIB_COLOR(HEX2RUIESCOLOR(titlebar.style[ATTR_TEXT_COLOR_NORMAL])));
+    DrawTextEx(titlebar.font, titlebar.text, RAYLIB_VEC2(text_pos), titlebar.font_size, 0, RAYLIB_COLOR(ruies_hex2color(titlebar.style[ATTR_TEXT_COLOR_NORMAL])));
     __ruies_error = 0;
 }
 
-void render_toggle(Ruies_Toggle_t* toggle) {
-    __detect_toggle_state_change(toggle);
+bool render_toggle(Ruies_Toggle_t* toggle, Ruies_ElemState_t* state) {
+    bool hover = CheckCollisionPointRec(GetMousePosition(), RAYLIB_RECT(toggle->bounds));
+    bool clicked = IsMouseButtonPressed(0);
+    if (!hover && !clicked && toggle->state != CLICKED) toggle->state = NORMAL;
+    else if (hover && !clicked && toggle->state != CLICKED) toggle->state = FOCUSED;
+    else if (hover && clicked && toggle->state != CLICKED) toggle->state = CLICKED;
+    else if (hover && clicked && toggle->state == CLICKED) toggle->state = NORMAL;
+
     Ruies_Color_t border_color, base_color, text_color;
-    Ruies_Vec2_t border_bounds[2] = {
-        /* Position */
-        __get_elem_with_border_pos(toggle->bounds, toggle->style[ATTR_BORDER_WIDTH]),
-        /* Dimension */
-        __get_elem_with_border_dims(toggle->bounds, toggle->style[ATTR_BORDER_WIDTH]),
-    };
     Ruies_Vec2_t text_pos = __get_elem_text_pos(toggle->bounds, toggle->font, toggle->text);
     get_style_colors(toggle->state, toggle->style, &border_color, &base_color, &text_color);
     /* Drawing */
-    DrawRectangleRec(RAYLIB_RECT(toggle->bounds), RAYLIB_COLOR(border_color));
-    DrawRectangleV(RAYLIB_VEC2(border_bounds[0]), RAYLIB_VEC2(border_bounds[1]), RAYLIB_COLOR(base_color));
+    ruies_draw_rect_with_border(toggle->bounds, toggle->style[ATTR_BORDER_WIDTH], border_color, base_color);
     DrawTextEx(toggle->font, toggle->text, RAYLIB_VEC2(text_pos), toggle->font_size, 0, RAYLIB_COLOR(text_color));
     __ruies_error = 0;
+    if (state != NULL) *state = toggle->state;
+    if (toggle->state == CLICKED) return true;
+    else return false;
 }
 
-void render_label(Ruies_Label_t* label) {
-    Ruies_Vec2_t text_pos = __get_text_pos_align(label->bounds, label->style[ATTR_LEFT_PADDING], 
-                                            label->style[ATTR_RIGHT_PADDING], (Ruies_TextAlignment_t)label->style[ATTR_TEXT_ALIGNMENT],
-                                            label->font, label->font_size, label->text);
-    Ruies_Color_t text_color = RUIES_COLOR(HEX2RUIESCOLOR(label->style[ATTR_TEXT_COLOR_NORMAL]));
+void render_label(Ruies_Label_t label) {
+    Ruies_Vec2_t text_pos = __get_text_pos_align(label.bounds, label.style[ATTR_LEFT_PADDING], 
+                                            label.style[ATTR_RIGHT_PADDING], (Ruies_TextAlignment_t)label.style[ATTR_TEXT_ALIGNMENT],
+                                            label.font, label.font_size, label.text);
+    Ruies_Color_t text_color = RUIES_COLOR(ruies_hex2color(label.style[ATTR_TEXT_COLOR_NORMAL]));
     /* Drawing */
-    DrawTextEx(label->font, label->text, RAYLIB_VEC2(text_pos), label->font_size, 0, RAYLIB_COLOR(text_color));
+    DrawTextEx(label.font, label.text, RAYLIB_VEC2(text_pos), label.font_size, 0, RAYLIB_COLOR(text_color));
     __ruies_error = 0;
 }
 
-void render_winbox(Ruies_WindowBox_t* winbox) {
-    __detect_winbox_state_change(winbox);
-    Ruies_Vec2_t border_pos[2] = {
-        __get_elem_with_border_pos(winbox->bounds, winbox->border_width),
-        __get_elem_with_border_dims(winbox->bounds, winbox->border_width),
-    };
-    DrawRectangleRec(RAYLIB_RECT(winbox->bounds), RAYLIB_COLOR(winbox->border_color));
-    DrawRectangleV(RAYLIB_VEC2(border_pos[0]), RAYLIB_VEC2(border_pos[1]), RAYLIB_COLOR(winbox->base_color));
+void render_winbox(Ruies_WindowBox_t* winbox, Ruies_ElemState_t* state) {
+    bool hover = CheckCollisionPointRec(GetMousePosition(), RAYLIB_RECT(winbox->bounds));
+    bool clicked = IsMouseButtonDown(0);
+    if (hover && !clicked) winbox->state = FOCUSED;
+    else if (hover && clicked) winbox->state = CLICKED;
+    else winbox->state = NORMAL;
+
+    ruies_draw_rect_with_border(winbox->bounds, winbox->style[ATTR_BORDER_WIDTH], 
+                                ruies_hex2color(winbox->style[ATTR_BORDER_COLOR_NORMAL]), 
+                                ruies_hex2color(winbox->style[ATTR_BASE_COLOR_NORMAL]));
     if (winbox->border_style == DOUBLE_BORDER) {
-        DrawRectangleV(RAYLIB_VEC2(VEC2ADDVALUE(border_pos[0], winbox->border_gap)), RAYLIB_VEC2(VEC2SUBVALUE(border_pos[1], 2.0f*winbox->border_gap)), 
-                      RAYLIB_COLOR(winbox->border_color));
-        DrawRectangleV(RAYLIB_VEC2(VEC2ADDVALUE(border_pos[0], winbox->border_gap+winbox->border_width)),
-                       RAYLIB_VEC2(VEC2SUBVALUE(border_pos[1], 2.0f*(winbox->border_width+winbox->border_gap))), RAYLIB_COLOR(winbox->base_color));
+        ruies_draw_rect_with_border(RECTWITHBORDER(winbox->bounds, winbox->style[ATTR_BORDER_GAP]+winbox->style[ATTR_BORDER_WIDTH]), winbox->style[ATTR_BORDER_WIDTH], 
+                                    ruies_hex2color(winbox->style[ATTR_BORDER_COLOR_NORMAL]), 
+                                    ruies_hex2color(winbox->style[ATTR_BASE_COLOR_NORMAL]));
     }
+    if (state != NULL) *state = winbox->state;
     __ruies_error = 0;
 }
 
+bool render_checkbox(Ruies_CheckBox_t* checkbox, Ruies_ElemState_t* state) {
+    bool hover = CheckCollisionPointRec(GetMousePosition(), RAYLIB_RECT(checkbox->bounds));
+    bool clicked = IsMouseButtonPressed(0);
+    if (!hover && !clicked && checkbox->state != CLICKED) checkbox->state = NORMAL;
+    else if (hover && !clicked && checkbox->state != CLICKED) checkbox->state = FOCUSED;
+    else if (hover && clicked && checkbox->state != CLICKED) checkbox->state = CLICKED;
+    else if (hover && clicked && checkbox->state == CLICKED) checkbox->state = NORMAL;
+
+    Ruies_Color_t border_color, base_color, text_color;
+
+    Ruies_Padding_t padding = {
+        .from_left = checkbox->style[ATTR_LEFT_PADDING],
+        .from_right = checkbox->style[ATTR_RIGHT_PADDING],
+        .from_top = checkbox->style[ATTR_TOP_PADDING],
+        .from_bottom = checkbox->style[ATTR_BOTTOM_PADDING],
+    };
+    Ruies_Vec2_t text_pos = __get_text_placement_pos(checkbox->bounds, padding, checkbox->text_pos, checkbox->font, checkbox->font_size, checkbox->text);
+    get_style_colors(checkbox->state, checkbox->style, &border_color, &base_color, &text_color);
+    /* Drawing */
+    ruies_draw_rect_with_border(checkbox->bounds, checkbox->style[ATTR_BORDER_WIDTH], border_color, base_color);
+    if (checkbox->state == CLICKED) {
+        DrawRectangleRec(RAYLIB_RECT(RECTWITHBORDER(checkbox->bounds, checkbox->style[ATTR_RECT_MARGIN]+checkbox->style[ATTR_BORDER_WIDTH])), RAYLIB_COLOR(border_color));
+    }
+    DrawTextEx(checkbox->font, checkbox->text, RAYLIB_VEC2(text_pos), checkbox->font_size, 0, RAYLIB_COLOR(text_color));
+    __ruies_error = 0;
+    if (state != NULL) *state = checkbox->state;
+    if (checkbox->state == CLICKED) return true;
+    else return false;
+} 
+
+void render_indicator(Ruies_Indicator_t indic, Ruies_IndicatorState_t* state) {
+    Ruies_Color_t border_color, base_color, text_color;
+    Ruies_Rect_t bounds = {
+        .x = indic.pos.x-indic.radius,
+        .y = indic.pos.y-indic.radius,
+        .width = 2.0f*indic.radius,
+        .height = 2.0f*indic.radius,
+    };
+    Ruies_Padding_t padding = {
+        .from_left = indic.style[ATTR_LEFT_PADDING],
+        .from_right = indic.style[ATTR_RIGHT_PADDING],
+        .from_top = indic.style[ATTR_TOP_PADDING],
+        .from_bottom = indic.style[ATTR_BOTTOM_PADDING],
+    };
+    Ruies_Vec2_t text_pos = __get_text_placement_pos(bounds, padding, indic.text_placement, indic.font, indic.font_size, indic.text);
+    static bool flick_on = false;
+    Ruies_ElemState_t tmp_state;
+    if (indic.state == INDICATOR_ON || (indic.state == INDICATOR_BLINKING && indic.blink_interval > 0.0f && flick_on)) {
+        tmp_state = CLICKED;
+    } else if (indic.state == INDICATOR_OFF || (indic.state == INDICATOR_BLINKING && indic.blink_interval > 0.0f && !flick_on)) {
+        tmp_state = NORMAL;
+    }
+    static float frame_time = 0.0f;
+    frame_time += GetFrameTime();
+    if (frame_time >= (1.0f/indic.blink_interval)) {
+        if (indic.state == INDICATOR_BLINKING) flick_on = !flick_on; 
+        frame_time = 0.0f;
+    }
+    get_style_colors(tmp_state, indic.style, &border_color, &base_color, &text_color);
+    DrawCircleV(RAYLIB_VEC2(indic.pos), indic.radius, RAYLIB_COLOR(border_color));
+    DrawCircleV(RAYLIB_VEC2(indic.pos), indic.radius-indic.style[ATTR_BORDER_WIDTH], RAYLIB_COLOR(base_color));
+    DrawTextEx(indic.font, indic.text, RAYLIB_VEC2(text_pos), indic.font_size, 0, RAYLIB_COLOR(text_color));
+    if (state != NULL) *state = indic.state;
+    __ruies_error = 0;
+}
 /* Internal function to calculate the position of the boundsagle relative to border width */
-Ruies_Vec2_t __get_elem_with_border_pos(Ruies_Rect_t bounds, uint32_t border_width) {
-    Ruies_Vec2_t border_pos = {0};
-    border_pos.x = bounds.x+(float)border_width;
-    border_pos.y = bounds.y+(float)border_width;
-    __ruies_error = 0;
-    return border_pos;
-}
-
-/* Internal functin to calculate the dimensions of the boundsagle relative to border width */
-Ruies_Vec2_t __get_elem_with_border_dims(Ruies_Rect_t bounds, uint32_t border_width) {
-    Ruies_Vec2_t border_dims = {0};
-    border_dims.x = bounds.width-(2.0f*(float)border_width);
-    border_dims.y = bounds.height-(2.0f*(float)border_width);
-    __ruies_error = 0;
-    return border_dims;
+void ruies_draw_rect_with_border(Ruies_Rect_t bounds, uint32_t border_width, Ruies_Color_t border_color, Ruies_Color_t base_color) {
+    DrawRectangleRec(RAYLIB_RECT(bounds), RAYLIB_COLOR(border_color));
+    DrawRectangleRec(RAYLIB_RECT(RECTWITHBORDER(bounds, border_width)), RAYLIB_COLOR(base_color));
 }
 
 /* Internal function to calculate the text position of a button */
@@ -1577,7 +1835,7 @@ Ruies_Vec2_t __get_elem_text_pos(Ruies_Rect_t bounds, Font font, const char* tex
 }
 
 Ruies_Vec2_t __get_text_pos_align(Ruies_Rect_t bounds, uint32_t left_padding, uint32_t right_padding, 
-                             Ruies_TextAlignment_t text_align, Font font, float font_size, const char* text) {
+                                  Ruies_TextAlignment_t text_align, Font font, float font_size, const char* text) {
     Ruies_Vec2_t text_pos = {0};
     Ruies_Vec2_t text_dims = RUIES_VEC2(MeasureTextEx(font, text, font_size, 0));
     /* Calculates the distance from the sides */
@@ -1598,74 +1856,37 @@ Ruies_Vec2_t __get_text_pos_align(Ruies_Rect_t bounds, uint32_t left_padding, ui
             __ruies_error = 1;
             break;
     }
-    __ruies_error = 0;
+    if (!__ruies_error) __ruies_error = 0;
     return text_pos;
 }
 
-Ruies_ElemState_t get_button_state(Ruies_Button_t button, bool* active) {
-    if (button.state == CLICKED) {
-        if (active != NULL) *active = true;
-    } else {
-        if (active != NULL) *active = false;
+Ruies_Vec2_t __get_text_placement_pos(Ruies_Rect_t elem_bounds, Ruies_Padding_t padding, Ruies_TextPlacement_t text_placement, 
+                                      Font font, float font_size, const char* text) {
+    Ruies_Vec2_t text_pos = {0};
+    Ruies_Vec2_t text_dims = RUIES_VEC2(MeasureTextEx(font, text, font_size, 0));
+    switch (text_placement) {
+        case TEXT_LEFT:
+            text_pos.x = elem_bounds.x-padding.from_right-text_dims.x;
+            text_pos.y = elem_bounds.y+(elem_bounds.height-text_dims.y)/2.0f;
+            break;
+        case TEXT_RIGHT:
+            text_pos.x = elem_bounds.x+elem_bounds.width+padding.from_left;
+            text_pos.y = elem_bounds.y+(elem_bounds.height-text_dims.y)/2.0f;
+            break;
+        case TEXT_UP:
+            text_pos.x = elem_bounds.x+(elem_bounds.width-text_dims.x)/2.0f;
+            text_pos.y = elem_bounds.y-padding.from_bottom-((elem_bounds.height-text_dims.y)/2.0f)-text_dims.y;
+            break;
+        case TEXT_DOWN:
+            text_pos.x = elem_bounds.x+(elem_bounds.width-text_dims.x)/2.0f;
+            text_pos.y = elem_bounds.y+padding.from_top+((elem_bounds.height-text_dims.y)/2.0f)+text_dims.y;
+        break;
+        default:
+            __ruies_error = 1;
+            break;
     }
-    __ruies_error = 0;
-    return button.state;
-}
-
-Ruies_ElemState_t get_toggle_state(Ruies_Toggle_t toggle, bool* active) {
-    if (toggle.state == CLICKED) { 
-        if (active != NULL) *active = true;
-    } else {
-        if (active != NULL) *active = false;
-    }
-    __ruies_error = 0;
-    return toggle.state;
-}
-
-Ruies_ElemState_t get_winbox_state(Ruies_WindowBox_t winbox) {
-    return winbox.state;
-}
-
-/* Functions for changing element states */
-void __detect_button_state_change(Ruies_Button_t* button) {
-    bool hover = CheckCollisionPointRec(GetMousePosition(), RAYLIB_RECT(button->bounds));
-    bool clicked = IsMouseButtonDown(0);
-    if (!hover && !clicked) {
-        button->state = NORMAL;
-    } else if (hover && !clicked) {
-        button->state = FOCUSED;
-    } else if (hover && clicked) {
-        button->state = CLICKED;
-    }
-    __ruies_error = 0;
-}
-
-void __detect_toggle_state_change(Ruies_Toggle_t* toggle) {
-    bool hover = CheckCollisionPointRec(GetMousePosition(), RAYLIB_RECT(toggle->bounds));
-    bool clicked = IsMouseButtonPressed(0);
-    if (!hover && !clicked && toggle->state != CLICKED) {
-        toggle->state = NORMAL;
-    } else if (hover && !clicked && toggle->state != CLICKED) {
-        toggle->state = FOCUSED;
-    } else if (hover && clicked && toggle->state != CLICKED) {
-        toggle->state = CLICKED;
-    } else if (hover && clicked && toggle->state == CLICKED) {
-        toggle->state = NORMAL;
-    }
-    __ruies_error = 0;
-}
-
-void __detect_winbox_state_change(Ruies_WindowBox_t* winbox) {
-    bool hover = CheckCollisionPointRec(GetMousePosition(), RAYLIB_RECT(winbox->bounds));
-    bool clicked = IsMouseButtonDown(0);
-    if (!hover && !clicked) {
-        winbox->state = NORMAL;
-    } else if (hover && !clicked) {
-        winbox->state = FOCUSED;
-    } else if (hover && clicked) {
-        winbox->state = CLICKED;
-    }
-    __ruies_error = 0;
+    if (!__ruies_error) __ruies_error = 0;
+    return text_pos;
 }
 
 int get_button_index_in_grid_by_its_idx(Ruies_ButtonGrid_t button_grid, Ruies_ElemID_t idx) {
@@ -1685,18 +1906,38 @@ void free_button_grid(Ruies_ButtonGrid_t button_grid) {
 }
 
 void free_cellbox(Ruies_CellBox_t cellbox) {
-    free(cellbox.cell_ids);
-    free(cellbox.cell_bounds);
+    free(cellbox.cells);
     __ruies_error = 0;
 }
 
+/* Miscellaneous functions */
+Ruies_Color_t ruies_hex2color(uint32_t hexval) {
+    Ruies_Color_t color = {0};
+    color = (Ruies_Color_t){
+        .r = (unsigned char)(((hexval) >> 24) & 0xFF),
+        .g = (unsigned char)(((hexval) >> 16) & 0xFF),
+        .b = (unsigned char)(((hexval) >> 8) & 0xFF),
+        .a = (unsigned char)((hexval) & 0xFF),
+    };                                                
+    __ruies_error = 0;
+    return color;
+}
+
+uint32_t ruies_color2hex(Ruies_Color_t color) {
+    uint32_t hexcolor = 0;
+    hexcolor = (uint32_t)(((uint32_t)color.r << 24) |
+                       ((uint32_t)color.g << 16) |
+                       ((uint32_t)color.b << 8) |
+                        (uint32_t)color.a);
+    __ruies_error = 0;
+    return hexcolor;
+}
+
 /* Custom strdup function */
-char* rlui_strdup(const char* str) {
+char* ruies_strdup(const char* str) {
     size_t len = strlen(str) + 1;
     char* n_str = malloc(len);
-    if (str) {
-        memcpy(n_str, str, len);
-    }
+    memcpy(n_str, str, len);
     return n_str;
 }
 #endif /* RUIES_IMPLEMENTATION */

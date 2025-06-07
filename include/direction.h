@@ -3,10 +3,10 @@
 
 typedef enum Direction {
     NO_CHANGE = 0,
-    LEFT,
-    RIGHT,
-    UP,
-    DOWN,
+    DIR_LEFT,
+    DIR_RIGHT,
+    DIR_UP,
+    DIR_DOWN,
 } direction_t;
 
 #endif /* DIRECTION_H_ */
