@@ -3,12 +3,12 @@
  *     First version: 1.0.0-beta
  *     Changelog: Initial release of the game
  *
- *     Current version: 1.0.1-beta
+ *     Old version: 1.0.1-beta
  *     Changelog: Changed: Rate of change in the speed of the snake is not depended on that speed
  *                         It is set to the constant game speed of 60FPS
  *                Removed: EVENTS in the include/game_events.h that handled the change of speed from the game events
  *
- *     Upcomming version: 1.1.0-beta
+ *     Old version: 1.1.0-beta
  *     Changelog: Added: You can see your version number in the title screen x
  *                       End screen x
  *                       You can use WASD keys to control your snake x
@@ -20,13 +20,19 @@
  *                         The game proportions have been changed significantly x
  *               
  *               And a lot of smaller improvements!!
+ *
+ *     Old version: 1.1.1-beta
+ *     Changelog: Removed unused functions in src/main.c
+ *
+ *     New version: 1.1.2-beta
+ *     Changelog: Removed useless information logging
  *                       
  */
 
 /* 
  * Started work on the end screen
  */
-#include <stdio.h>
+
 #include <time.h>
 
 #include "raylib.h"
