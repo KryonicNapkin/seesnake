@@ -10,7 +10,6 @@
 
 snake_t* snake_make(const int initial_tail_lenght, const float velocity, const int grid_size) {
     snake_t* snake = calloc(1, sizeof(snake_t));
-    TraceLog(LOG_INFO, "Grid_size1: %d\n", grid_size);
 
     snake->head_cell_num = UNSET_CELL;
     snake->food_cell_num = UNSET_CELL;
@@ -243,14 +242,12 @@ void unset_unused_tail_directions(snake_t** snake, snake_game_grid_t** grid) {
 void set_random_snake_spawn(snake_t** snake, const int grid_size, const int lines_excluded_from_edges) {
     int size = grid_size-(2*lines_excluded_from_edges);
     int not_excluded_cell[size];
-    TraceLog(LOG_INFO, "grid_size: %d\n", grid_size);
 
     for (int i = 0; i < size; ++i) {
         not_excluded_cell[i] = GetRandomValue(((grid_size*lines_excluded_from_edges)+lines_excluded_from_edges)+(i*grid_size), 
                                               ((grid_size*(1+lines_excluded_from_edges))-(1+lines_excluded_from_edges))+(i*grid_size));
     }
     int random_cell = not_excluded_cell[GetRandomValue(0, size-1)];
-    printf("Random_cell: %d\n", random_cell);
     (*snake)->head_cell_num = random_cell;
 }
 

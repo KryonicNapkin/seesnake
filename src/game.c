@@ -84,8 +84,6 @@ void update_game(game_t** game, game_event_t event) {
     else if (event & EVENT_CHANGE_MOVE_RIGHT) change_snake_direction_right((*game)->snake, &(*game)->grid);
 
     if (event & EVENT_HEAD_TAIL_COLLISION) {
-        TraceLog(LOG_INFO, "Game over!\n");
-        TraceLog(LOG_INFO, "Your score: %d\n", (*game)->score);
         (*game)->action = SHOW_END_SCREEN;
     }
     if (event & EVENT_FOOD_COLLISION) {
