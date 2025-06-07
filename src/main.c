@@ -45,9 +45,6 @@
 
 #define STATS_SPACE 25.0f
 
-static void print_tail_pos(snake_t* snake);
-void do_the_crazy(game_theme_t* theme);
-
 int main(int argc, char* argv[]) {
     const char* title_text = "SeeSnake";
     InitWindow(WIN_WIDTH, WIN_HEIGHT, title_text);
@@ -148,10 +145,4 @@ int main(int argc, char* argv[]) {
     CloseWindow();
     game_free(game);
     return 0;
-}
-
-static void print_tail_pos(snake_t* snake) {
-    for (int i = 0; i < snake->tail_lenght; ++i) {
-        printf("Tail[%d]: cell_num: %d\n", i, snake->tail_cell_nums[i]);
-    }
 }
